@@ -1,10 +1,11 @@
-GO=go
+# Copyright (c) 2019 Sunil
 
-TARGET=git-stats
+TARGET = git-stats
 
+.PHONY: all
 all: ${TARGET}
 
-build: ${TARGET}
+include common.mk
 
 run: ${TARGET}
 	./${TARGET}
@@ -13,5 +14,5 @@ ${TARGET}: src/git-stats.go
 	${GO} build -o $@ $^
 
 .PHONY: clean
-clean:
+clean: decruft
 	rm ${TARGET}
