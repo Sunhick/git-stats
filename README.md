@@ -16,6 +16,7 @@ After building you can add the folder containing ```git-stats``` to the PATH var
 ## Flags
 
 | Flags     | Description                         |
+|-----------|-------------------------------------|
 | --summary | Default flag, shows the git summary |
 | --ui      | show git commit dots                |
 | ...       | ...                                 |
