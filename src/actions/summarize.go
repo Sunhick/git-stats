@@ -18,26 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package actions
 
-import (
-	"fmt"
-	"flag"
-	actions "./actions"
-)
+import "fmt"
 
-func main() {
-	fmt.Println("Running git stats")
-	summary := flag.Bool("summarize", false, "Summarize the git commits so far")
-	contrib := flag.Bool("contrib", false, "Show git contribution dot-graph in tui")
-
-	flag.Parse()
-
-	if (*summary) {
-		actions.Summarize()
-	}
-
-	if (*contrib) {
-		actions.Contrib()
-	}
+func Summarize() {
+	fmt.Println("Summary of git commits")
 }
