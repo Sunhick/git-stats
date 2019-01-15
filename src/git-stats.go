@@ -21,9 +21,9 @@
 package main
 
 import (
-	"fmt"
-	"flag"
 	actions "./actions"
+	"flag"
+	"fmt"
 )
 
 func main() {
@@ -33,11 +33,11 @@ func main() {
 
 	flag.Parse()
 
-	if (*summary) {
+	if *summary {
 		actions.Summarize()
 	}
 
-	if (*contrib) {
+	if *contrib {
 		actions.Contrib()
 	}
 }
