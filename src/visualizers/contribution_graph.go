@@ -273,6 +273,11 @@ func (cgr *ContributionGraphRenderer) getColorScheme() ColorScheme {
 	}
 }
 
+// RenderLegend renders the legend showing commit levels with colors (public for testing)
+func (cgr *ContributionGraphRenderer) RenderLegend(maxCommits int) string {
+	return cgr.renderLegend(maxCommits)
+}
+
 // renderLegend renders the legend showing commit levels with colors
 func (cgr *ContributionGraphRenderer) renderLegend(maxCommits int) string {
 	var result strings.Builder
