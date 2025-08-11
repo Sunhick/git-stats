@@ -25,6 +25,12 @@ type ChartsVisualizer interface {
 	RenderBarChart(data map[string]int, title string, config models.RenderConfig) (string, error)
 	RenderTable(headers []string, rows [][]string, config models.RenderConfig) (string, error)
 	RenderSummaryStats(summary *models.StatsSummary, config models.RenderConfig) (string, error)
+	RenderContributorStats(contributors []models.Contributor, config models.RenderConfig) (string, error)
+	RenderHealthMetrics(health *models.HealthMetrics, config models.RenderConfig) (string, error)
+	RenderTimeBasedAnalysis(summary *models.StatsSummary, config models.RenderConfig) (string, error)
+	RenderCollaborationPatterns(contributors []models.Contributor, config models.RenderConfig) (string, error)
+	RenderFrequencyAnalysis(summary *models.StatsSummary, config models.RenderConfig) (string, error)
+	RenderFileStatistics(summary *models.StatsSummary, config models.RenderConfig) (string, error)
 }
 
 // GUIVisualizer interface for ncurses GUI rendering

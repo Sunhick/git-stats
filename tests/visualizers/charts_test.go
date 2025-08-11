@@ -532,3 +532,360 @@ func TestGetTimeSlot(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderCollaborationPatterns(t *testing.T) {
+	config := models.RenderConfig{Width: 50}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	contributors := []models.Contributor{
+		{
+			Name:        "Alice",
+			Email:       "alice@example.com",
+			FirstCommit: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			LastCommit:  time.Date(2023, 6, 30, 0, 0, 0, 0, time.UTC),
+			TopFiles:    []string{"main.go", "utils.go", "config.go"},
+		},
+		{
+			Name:        "Bob",
+			Email:       "bob@example.com",
+			FirstCommit: time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC),
+			LastCommit:  time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC),
+			TopFiles:    []string{"main.go", "parser.go", "config.go"},
+		},
+		{
+			Name:        "Charlie",
+			Email:       "charlie@example.com",
+			FirstCommit: time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC),
+			LastCommit:  time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC),
+			TopFiles:    []string{"test.go", "docs.md"},
+		},
+	}
+
+	result, err := renderer.RenderCollaborationPatterns(contributors, config)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if result == "" {
+		t.Fatal("Expected non-empty result")
+	}
+
+	// Check that title is present
+	if !strings.Contains(result, "Collaboration Patterns") {
+		t.Error("Expected result to contain title")
+	}
+
+	// Check that file overlap analysis is present
+	if !strings.Contains(result, "File Overlap Analysis") {
+		t.Error("Expected result to contain file overlap analysis")
+	}
+
+	// Check that activity overlap is present
+	if !strings.Contains(result, "Activity Overlap") {
+		t.Error("Expected result to contain activity overlap")
+	}
+
+	// Check that collaborative files are identified
+	if !strings.Contains(result, "main.go") || !strings.Contains(result, "config.go") {
+		t.Error("Expected result to identify collaborative files")
+	}
+}
+
+func TestRenderCollaborationPatternsNilOrEmpty(t *testing.T) {
+	config := models.RenderConfig{}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	// Test nil contributors
+	_, err := renderer.RenderCollaborationPatterns(nil, config)
+	if err == nil {
+		t.Fatal("Expected error for nil contributors")
+	}
+
+	// Test empty contributors
+	_, err = renderer.RenderCollaborationPatterns([]models.Contributor{}, config)
+	if err == nil {
+		t.Fatal("Expected error for empty contributors")
+	}
+}
+
+func TestRenderFrequencyAnalysis(t *testing.T) {
+	config := models.RenderConfig{Width: 50}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	summary := &models.StatsSummary{
+		TotalCommits:     100,
+		ActiveDays:       30,
+		AvgCommitsPerDay: 3.33,
+		CommitsByHour: map[int]int{
+			9:  15,
+			14: 25,
+			18: 20,
+		},
+		CommitsByWeekday: map[time.Weekday]int{
+			time.Monday:    20,
+			time.Tuesday:   15,
+			time.Wednesday: 25,
+			time.Thursday:  20,
+			time.Friday:    20,
+		},
+	}
+
+	result, err := renderer.RenderFrequencyAnalysis(summary, config)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if result == "" {
+		t.Fatal("Expected non-empty result")
+	}
+
+	// Check that title is present
+	if !strings.Contains(result, "Commit Frequency Analysis") {
+		t.Error("Expected result to contain title")
+	}
+
+	// Check that frequency metrics are present
+	if !strings.Contains(result, "Average Commits per Day") {
+		t.Error("Expected result to contain daily average")
+	}
+
+	if !strings.Contains(result, "Average Commits per Week") {
+		t.Error("Expected result to contain weekly average")
+	}
+
+	if !strings.Contains(result, "Average Commits per Month") {
+		t.Error("Expected result to contain monthly average")
+	}
+
+	// Check that peak analysis is present
+	if !strings.Contains(result, "Peak Activity Analysis") {
+		t.Error("Expected result to contain peak analysis")
+	}
+
+	if !strings.Contains(result, "Peak Hour") {
+		t.Error("Expected result to contain peak hour")
+	}
+
+	if !strings.Contains(result, "Peak Weekday") {
+		t.Error("Expected result to contain peak weekday")
+	}
+
+	// Check that calculated values are present
+	if !strings.Contains(result, "3.33") {
+		t.Error("Expected result to contain average commits per day")
+	}
+}
+
+func TestRenderFrequencyAnalysisNil(t *testing.T) {
+	config := models.RenderConfig{}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	_, err := renderer.RenderFrequencyAnalysis(nil, config)
+	if err == nil {
+		t.Fatal("Expected error for nil summary")
+	}
+
+	if !strings.Contains(err.Error(), "cannot be nil") {
+		t.Errorf("Expected error message about nil summary, got: %v", err)
+	}
+}
+
+func TestRenderContributorStatsWithPercentages(t *testing.T) {
+	config := models.RenderConfig{Width: 50}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	contributors := []models.Contributor{
+		{
+			Name:             "Alice",
+			Email:            "alice@example.com",
+			TotalCommits:     60,
+			TotalInsertions:  3000,
+			TotalDeletions:   1000,
+			ActiveDays:       20,
+			FirstCommit:      time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			LastCommit:       time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			Name:             "Bob",
+			Email:            "bob@example.com",
+			TotalCommits:     40,
+			TotalInsertions:  2000,
+			TotalDeletions:   500,
+			ActiveDays:       15,
+			FirstCommit:      time.Date(2023, 2, 1, 0, 0, 0, 0, time.UTC),
+			LastCommit:       time.Date(2023, 11, 30, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	result, err := renderer.RenderContributorStats(contributors, config)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if result == "" {
+		t.Fatal("Expected non-empty result")
+	}
+
+	// Check that percentages are calculated and displayed
+	if !strings.Contains(result, "60.0%") {
+		t.Error("Expected result to contain Alice's percentage (60%)")
+	}
+
+	if !strings.Contains(result, "40.0%") {
+		t.Error("Expected result to contain Bob's percentage (40%)")
+	}
+
+	// Check that percentage column header is present
+	if !strings.Contains(result, "Percentage") {
+		t.Error("Expected result to contain Percentage column header")
+	}
+
+	// Check that lines added distribution is present
+	if !strings.Contains(result, "Lines Added Distribution") {
+		t.Error("Expected result to contain lines added distribution")
+	}
+}
+func TestRenderFileStatistics(t *testing.T) {
+	config := models.RenderConfig{Width: 50}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	summary := &models.StatsSummary{
+		TopFiles: []models.FileStats{
+			{
+				Path:         "main.go",
+				Commits:      15,
+				Insertions:   500,
+				Deletions:    100,
+				LastModified: time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				Path:         "utils/helper.go",
+				Commits:      10,
+				Insertions:   300,
+				Deletions:    50,
+				LastModified: time.Date(2023, 11, 15, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		TopFileTypes: []models.FileTypeStats{
+			{
+				Extension: ".go",
+				Files:     20,
+				Commits:   80,
+				Lines:     4000,
+			},
+			{
+				Extension: ".js",
+				Files:     10,
+				Commits:   30,
+				Lines:     1500,
+			},
+			{
+				Extension: "",
+				Files:     5,
+				Commits:   10,
+				Lines:     200,
+			},
+		},
+	}
+
+	result, err := renderer.RenderFileStatistics(summary, config)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if result == "" {
+		t.Fatal("Expected non-empty result")
+	}
+
+	// Check that title is present
+	if !strings.Contains(result, "File Statistics") {
+		t.Error("Expected result to contain title")
+	}
+
+	// Check that file information is present
+	if !strings.Contains(result, "Most Frequently Modified Files") {
+		t.Error("Expected result to contain file section")
+	}
+
+	if !strings.Contains(result, "main.go") {
+		t.Error("Expected result to contain main.go")
+	}
+
+	if !strings.Contains(result, "utils/helper.go") {
+		t.Error("Expected result to contain utils/helper.go")
+	}
+
+	// Check that file type information is present
+	if !strings.Contains(result, "File Type Statistics") {
+		t.Error("Expected result to contain file type section")
+	}
+
+	if !strings.Contains(result, ".go") {
+		t.Error("Expected result to contain .go extension")
+	}
+
+	if !strings.Contains(result, ".js") {
+		t.Error("Expected result to contain .js extension")
+	}
+
+	if !strings.Contains(result, "(no extension)") {
+		t.Error("Expected result to handle files with no extension")
+	}
+
+	// Check that charts are present
+	if !strings.Contains(result, "File Modification Frequency") {
+		t.Error("Expected result to contain file modification frequency chart")
+	}
+
+	if !strings.Contains(result, "File Type Distribution") {
+		t.Error("Expected result to contain file type distribution")
+	}
+
+	// Check that percentages are calculated
+	if !strings.Contains(result, "%") {
+		t.Error("Expected result to contain percentage calculations")
+	}
+
+	// Check that net changes are calculated
+	if !strings.Contains(result, "+400") { // 500 - 100 for main.go
+		t.Error("Expected result to contain net changes calculation")
+	}
+}
+
+func TestRenderFileStatisticsNil(t *testing.T) {
+	config := models.RenderConfig{}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	_, err := renderer.RenderFileStatistics(nil, config)
+	if err == nil {
+		t.Fatal("Expected error for nil summary")
+	}
+
+	if !strings.Contains(err.Error(), "cannot be nil") {
+		t.Errorf("Expected error message about nil summary, got: %v", err)
+	}
+}
+
+func TestRenderFileStatisticsEmpty(t *testing.T) {
+	config := models.RenderConfig{Width: 50}
+	renderer := visualizers.NewChartsRenderer(config)
+
+	summary := &models.StatsSummary{
+		TopFiles:     []models.FileStats{},
+		TopFileTypes: []models.FileTypeStats{},
+	}
+
+	result, err := renderer.RenderFileStatistics(summary, config)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if result == "" {
+		t.Fatal("Expected non-empty result")
+	}
+
+	// Should still contain the title
+	if !strings.Contains(result, "File Statistics") {
+		t.Error("Expected result to contain title even with empty data")
+	}
+}

@@ -290,15 +290,27 @@ func (cr *ChartsRenderer) RenderContributorStats(contributors []models.Contribut
 	result.WriteString("Contributor Statistics\n")
 	result.WriteString("======================\n\n")
 
-	// Summary table
-	headers := []string{"Name", "Email", "Commits", "Insertions", "Deletions", "Active Days", "First Commit", "Last Commit"}
+	// Calculate total commits for percentage calculation
+	totalCommits := 0
+	for _, contributor := range contributors {
+		totalCommits += contributor.TotalCommits
+	}
+
+	// Summary table with percentages (Requirement 3.1)
+	headers := []string{"Name", "Email", "Commits", "Percentage", "Insertions", "Deletions", "Active Days", "First Commit", "Last Commit"}
 	var rows [][]string
 
 	for _, contributor := range contributors {
+		percentage := 0.0
+		if totalCommits > 0 {
+			percentage = float64(contributor.TotalCommits) / float64(totalCommits) * 100
+		}
+
 		row := []string{
 			contributor.Name,
 			contributor.Email,
 			fmt.Sprintf("%d", contributor.TotalCommits),
+			fmt.Sprintf("%.1f%%", percentage),
 			fmt.Sprintf("%d", contributor.TotalInsertions),
 			fmt.Sprintf("%d", contributor.TotalDeletions),
 			fmt.Sprintf("%d", contributor.ActiveDays),
@@ -328,6 +340,21 @@ func (cr *ChartsRenderer) RenderContributorStats(contributors []models.Contribut
 	commitChart, err := cr.RenderBarChart(commitData, "", config)
 	if err == nil {
 		result.WriteString(commitChart)
+	}
+	result.WriteString("\n")
+
+	// Lines of code distribution chart
+	result.WriteString("Lines Added Distribution\n")
+	result.WriteString("------------------------\n")
+
+	linesData := make(map[string]int)
+	for _, contributor := range contributors {
+		linesData[contributor.Name] = contributor.TotalInsertions
+	}
+
+	linesChart, err := cr.RenderBarChart(linesData, "", config)
+	if err == nil {
+		result.WriteString(linesChart)
 	}
 
 	return result.String(), nil
@@ -475,4 +502,349 @@ func (cr *ChartsRenderer) getTimeSlot(hour int) string {
 	default:
 		return "Night"
 	}
+}
+
+// RenderCollaborationPatterns renders collaboration patterns between contributors (Requirement 3.3)
+func (cr *ChartsRenderer) RenderCollaborationPatterns(contributors []models.Contributor, config models.RenderConfig) (string, error) {
+	if contributors == nil || len(contributors) == 0 {
+		return "", fmt.Errorf("contributors cannot be nil or empty")
+	}
+
+	var result strings.Builder
+
+	result.WriteString("Collaboration Patterns\n")
+	result.WriteString("======================\n\n")
+
+	// File overlap analysis - contributors working on similar files
+	result.WriteString("File Overlap Analysis\n")
+	result.WriteString("---------------------\n")
+
+	// Create a map of files to contributors
+	fileContributors := make(map[string][]string)
+	for _, contributor := range contributors {
+		for _, file := range contributor.TopFiles {
+			fileContributors[file] = append(fileContributors[file], contributor.Name)
+		}
+	}
+
+	// Find files with multiple contributors
+	collaborativeFiles := make(map[string]int)
+	for file, contribs := range fileContributors {
+		if len(contribs) > 1 {
+			collaborativeFiles[file] = len(contribs)
+		}
+	}
+
+	if len(collaborativeFiles) > 0 {
+		headers := []string{"File", "Contributors", "Collaboration Level"}
+		var rows [][]string
+
+		// Sort by collaboration level
+		type fileCollab struct {
+			file  string
+			count int
+		}
+		var sortedFiles []fileCollab
+		for file, count := range collaborativeFiles {
+			sortedFiles = append(sortedFiles, fileCollab{file, count})
+		}
+
+		// Sort by count descending
+		for i := 0; i < len(sortedFiles)-1; i++ {
+			for j := i + 1; j < len(sortedFiles); j++ {
+				if sortedFiles[i].count < sortedFiles[j].count {
+					sortedFiles[i], sortedFiles[j] = sortedFiles[j], sortedFiles[i]
+				}
+			}
+		}
+
+		for _, fc := range sortedFiles {
+			level := "Low"
+			if fc.count >= 5 {
+				level = "High"
+			} else if fc.count >= 3 {
+				level = "Medium"
+			}
+
+			contributorNames := strings.Join(fileContributors[fc.file], ", ")
+			if len(contributorNames) > 50 {
+				contributorNames = contributorNames[:47] + "..."
+			}
+
+			row := []string{
+				fc.file,
+				contributorNames,
+				level,
+			}
+			rows = append(rows, row)
+		}
+
+		table, err := cr.RenderTable(headers, rows, config)
+		if err == nil {
+			result.WriteString(table)
+		}
+		result.WriteString("\n")
+	} else {
+		result.WriteString("No collaborative files found.\n\n")
+	}
+
+	// Activity overlap analysis - contributors active in similar time periods
+	result.WriteString("Activity Overlap\n")
+	result.WriteString("----------------\n")
+
+	overlapData := make(map[string]int)
+	for i, contrib1 := range contributors {
+		for j, contrib2 := range contributors {
+			if i >= j {
+				continue
+			}
+
+			// Check if their active periods overlap
+			overlap := cr.calculateTimeOverlap(contrib1, contrib2)
+			if overlap > 0 {
+				pairName := fmt.Sprintf("%s & %s", contrib1.Name, contrib2.Name)
+				overlapData[pairName] = overlap
+			}
+		}
+	}
+
+	if len(overlapData) > 0 {
+		overlapChart, err := cr.RenderBarChart(overlapData, "", config)
+		if err == nil {
+			result.WriteString(overlapChart)
+		}
+	} else {
+		result.WriteString("No significant activity overlap found.\n")
+	}
+
+	return result.String(), nil
+}
+
+// calculateTimeOverlap calculates the overlap in active days between two contributors
+func (cr *ChartsRenderer) calculateTimeOverlap(contrib1, contrib2 models.Contributor) int {
+	// Simple overlap calculation based on active periods
+	start1, end1 := contrib1.FirstCommit, contrib1.LastCommit
+	start2, end2 := contrib2.FirstCommit, contrib2.LastCommit
+
+	// Find overlap period
+	overlapStart := start1
+	if start2.After(start1) {
+		overlapStart = start2
+	}
+
+	overlapEnd := end1
+	if end2.Before(end1) {
+		overlapEnd = end2
+	}
+
+	if overlapStart.Before(overlapEnd) {
+		return int(overlapEnd.Sub(overlapStart).Hours() / 24)
+	}
+
+	return 0
+}
+
+// RenderFrequencyAnalysis renders commit frequency analysis (Requirement 2.3)
+func (cr *ChartsRenderer) RenderFrequencyAnalysis(summary *models.StatsSummary, config models.RenderConfig) (string, error) {
+	if summary == nil {
+		return "", fmt.Errorf("summary cannot be nil")
+	}
+
+	var result strings.Builder
+
+	result.WriteString("Commit Frequency Analysis\n")
+	result.WriteString("=========================\n\n")
+
+	// Basic frequency metrics
+	result.WriteString("Frequency Metrics\n")
+	result.WriteString("-----------------\n")
+	result.WriteString(fmt.Sprintf("Average Commits per Day:    %.2f\n", summary.AvgCommitsPerDay))
+	result.WriteString(fmt.Sprintf("Average Commits per Week:   %.2f\n", summary.AvgCommitsPerDay*7))
+	result.WriteString(fmt.Sprintf("Average Commits per Month:  %.2f\n", summary.AvgCommitsPerDay*30))
+	result.WriteString(fmt.Sprintf("Total Active Days:          %d\n", summary.ActiveDays))
+
+	if summary.TotalCommits > 0 && summary.ActiveDays > 0 {
+		result.WriteString(fmt.Sprintf("Activity Ratio:             %.1f%% (active days / total period)\n",
+			float64(summary.ActiveDays)/float64(summary.TotalCommits)*100))
+	}
+	result.WriteString("\n")
+
+	// Peak activity analysis
+	result.WriteString("Peak Activity Analysis\n")
+	result.WriteString("----------------------\n")
+
+	// Find peak hour
+	maxHourCommits := 0
+	peakHour := 0
+	for hour, commits := range summary.CommitsByHour {
+		if commits > maxHourCommits {
+			maxHourCommits = commits
+			peakHour = hour
+		}
+	}
+
+	// Find peak weekday
+	maxWeekdayCommits := 0
+	var peakWeekday time.Weekday
+	for weekday, commits := range summary.CommitsByWeekday {
+		if commits > maxWeekdayCommits {
+			maxWeekdayCommits = commits
+			peakWeekday = weekday
+		}
+	}
+
+	result.WriteString(fmt.Sprintf("Peak Hour:                  %02d:00 (%d commits)\n", peakHour, maxHourCommits))
+	result.WriteString(fmt.Sprintf("Peak Weekday:               %s (%d commits)\n", peakWeekday.String(), maxWeekdayCommits))
+	result.WriteString(fmt.Sprintf("Peak Hour Time Slot:        %s\n", cr.getTimeSlot(peakHour)))
+
+	return result.String(), nil
+}
+// RenderFileStatistics renders detailed file and file type statistics (Requirement 2.6)
+func (cr *ChartsRenderer) RenderFileStatistics(summary *models.StatsSummary, config models.RenderConfig) (string, error) {
+	if summary == nil {
+		return "", fmt.Errorf("summary cannot be nil")
+	}
+
+	var result strings.Builder
+
+	result.WriteString("File Statistics\n")
+	result.WriteString("===============\n\n")
+
+	// Most frequently modified files
+	if len(summary.TopFiles) > 0 {
+		result.WriteString("Most Frequently Modified Files\n")
+		result.WriteString("------------------------------\n")
+
+		headers := []string{"Rank", "File", "Commits", "Insertions", "Deletions", "Net Changes", "Last Modified"}
+		var rows [][]string
+
+		for i, file := range summary.TopFiles {
+			netChanges := file.Insertions - file.Deletions
+			netChangeStr := fmt.Sprintf("%+d", netChanges)
+
+			row := []string{
+				fmt.Sprintf("#%d", i+1),
+				file.Path,
+				fmt.Sprintf("%d", file.Commits),
+				fmt.Sprintf("%d", file.Insertions),
+				fmt.Sprintf("%d", file.Deletions),
+				netChangeStr,
+				file.LastModified.Format("2006-01-02"),
+			}
+			rows = append(rows, row)
+		}
+
+		table, err := cr.RenderTable(headers, rows, config)
+		if err == nil {
+			result.WriteString(table)
+		}
+		result.WriteString("\n")
+
+		// File modification frequency chart
+		result.WriteString("File Modification Frequency\n")
+		result.WriteString("---------------------------\n")
+
+		fileData := make(map[string]int)
+		for _, file := range summary.TopFiles {
+			// Truncate long file names for better display
+			fileName := file.Path
+			if len(fileName) > 30 {
+				fileName = "..." + fileName[len(fileName)-27:]
+			}
+			fileData[fileName] = file.Commits
+		}
+
+		fileChart, err := cr.RenderBarChart(fileData, "", config)
+		if err == nil {
+			result.WriteString(fileChart)
+		}
+		result.WriteString("\n")
+	}
+
+	// File type statistics
+	if len(summary.TopFileTypes) > 0 {
+		result.WriteString("File Type Statistics\n")
+		result.WriteString("--------------------\n")
+
+		headers := []string{"Rank", "Extension", "Files", "Commits", "Total Lines", "Avg Lines/File", "Commit %"}
+		var rows [][]string
+
+		totalCommits := 0
+		for _, fileType := range summary.TopFileTypes {
+			totalCommits += fileType.Commits
+		}
+
+		for i, fileType := range summary.TopFileTypes {
+			avgLines := 0
+			if fileType.Files > 0 {
+				avgLines = fileType.Lines / fileType.Files
+			}
+
+			commitPercentage := 0.0
+			if totalCommits > 0 {
+				commitPercentage = float64(fileType.Commits) / float64(totalCommits) * 100
+			}
+
+			extension := fileType.Extension
+			if extension == "" {
+				extension = "(no extension)"
+			}
+
+			row := []string{
+				fmt.Sprintf("#%d", i+1),
+				extension,
+				fmt.Sprintf("%d", fileType.Files),
+				fmt.Sprintf("%d", fileType.Commits),
+				fmt.Sprintf("%d", fileType.Lines),
+				fmt.Sprintf("%d", avgLines),
+				fmt.Sprintf("%.1f%%", commitPercentage),
+			}
+			rows = append(rows, row)
+		}
+
+		table, err := cr.RenderTable(headers, rows, config)
+		if err == nil {
+			result.WriteString(table)
+		}
+		result.WriteString("\n")
+
+		// File type distribution charts
+		result.WriteString("File Type Distribution\n")
+		result.WriteString("----------------------\n")
+
+		// Commits by file type
+		result.WriteString("Commits by File Type:\n")
+		typeCommitData := make(map[string]int)
+		for _, fileType := range summary.TopFileTypes {
+			extension := fileType.Extension
+			if extension == "" {
+				extension = "no-ext"
+			}
+			typeCommitData[extension] = fileType.Commits
+		}
+
+		typeCommitChart, err := cr.RenderBarChart(typeCommitData, "", config)
+		if err == nil {
+			result.WriteString(typeCommitChart)
+		}
+		result.WriteString("\n")
+
+		// Lines by file type
+		result.WriteString("Lines by File Type:\n")
+		typeLinesData := make(map[string]int)
+		for _, fileType := range summary.TopFileTypes {
+			extension := fileType.Extension
+			if extension == "" {
+				extension = "no-ext"
+			}
+			typeLinesData[extension] = fileType.Lines
+		}
+
+		typeLinesChart, err := cr.RenderBarChart(typeLinesData, "", config)
+		if err == nil {
+			result.WriteString(typeLinesChart)
+		}
+	}
+
+	return result.String(), nil
 }
