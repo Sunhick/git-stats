@@ -41,18 +41,9 @@ type StatsSummary struct {
 	TopFileTypes     []FileTypeStats
 }
 
-// ContributorStats contains statistics for a single contributor
-type ContributorStats struct {
-	Name            string
-	Email           string
-	TotalCommits    int
-	TotalInsertions int
-	TotalDeletions  int
-	FirstCommit     time.Time
-	LastCommit      time.Time
-	ActiveDays      int
-	CommitsByDay    map[string]int
-}
+// ContributorStats is an alias for backward compatibility
+// Use Contributor from contributor.go for new implementations
+type ContributorStats = Contributor
 
 // ContributionGraph represents the GitHub-style contribution graph
 type ContributionGraph struct {
