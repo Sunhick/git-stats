@@ -4,8 +4,8 @@
 package visualizers
 
 import (
-	"time"
 	"git-stats/models"
+	"time"
 )
 
 // Visualizer interface for rendering output

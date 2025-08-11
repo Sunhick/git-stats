@@ -25,13 +25,13 @@ func ParseDate(dateStr string) (time.Time, error) {
 
 	// Try different date formats
 	formats := []string{
-		"2006-01-02",           // YYYY-MM-DD
-		"2006-01-02 15:04:05",  // YYYY-MM-DD HH:MM:SS
-		"2006/01/02",           // YYYY/MM/DD
-		"01/02/2006",           // MM/DD/YYYY
-		"02-01-2006",           // DD-MM-YYYY
-		time.RFC3339,           // ISO 8601
-		time.RFC822,            // RFC 822
+		"2006-01-02",          // YYYY-MM-DD
+		"2006-01-02 15:04:05", // YYYY-MM-DD HH:MM:SS
+		"2006/01/02",          // YYYY/MM/DD
+		"01/02/2006",          // MM/DD/YYYY
+		"02-01-2006",          // DD-MM-YYYY
+		time.RFC3339,          // ISO 8601
+		time.RFC822,           // RFC 822
 	}
 
 	for _, format := range formats {
@@ -203,4 +203,61 @@ func GetDateRange(rangeStr string) (time.Time, time.Time, error) {
 		return time.Time{}, time.Time{}, NewGitStatsError(ErrInvalidDateFormat,
 			fmt.Sprintf("unknown date range: %s", rangeStr), nil)
 	}
+}
+
+// ValidateDateRange validates that start date is before end date
+func ValidateDateRange(start, end time.Time) error {
+	if start.After(end) {
+		return NewGitStatsError(ErrInvalidDateFormat,
+			fmt.Sprintf("start date (%s) must be before end date (%s)",
+				start.Format("2006-01-02"), end.Format("2006-01-02")), nil)
+	}
+	return nil
+}
+
+// GetContributionGraphDateRange returns the date range for contribution graph display
+func GetContributionGraphDateRange(endDate time.Time) (time.Time, time.Time) {
+	// GitHub-style: show past 12 months ending on the specified date
+	start := endDate.AddDate(-1, 0, 0)
+
+	// Align to start of week (Sunday)
+	for start.Weekday() != time.Sunday {
+		start = start.AddDate(0, 0, -1)
+	}
+
+	// Align end to end of week (Saturday)
+	end := endDate
+	for end.Weekday() != time.Saturday {
+		end = end.AddDate(0, 0, 1)
+	}
+
+	return start, end
+}
+
+// GetWeekdayName returns the name of the weekday
+func GetWeekdayName(weekday time.Weekday) string {
+	names := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	return names[int(weekday)]
+}
+
+// GetMonthName returns the name of the month
+func GetMonthName(month time.Month) string {
+	return month.String()
+}
+
+// GetDayOfYear returns the day of year (1-366)
+func GetDayOfYear(date time.Time) int {
+	return date.YearDay()
+}
+
+// IsWeekend returns true if the date falls on a weekend
+func IsWeekend(date time.Time) bool {
+	weekday := date.Weekday()
+	return weekday == time.Saturday || weekday == time.Sunday
+}
+
+// GetQuarter returns the quarter (1-4) for the given date
+func GetQuarter(date time.Time) int {
+	month := int(date.Month())
+	return (month-1)/3 + 1
 }

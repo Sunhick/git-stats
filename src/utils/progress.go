@@ -6,6 +6,7 @@ package utils
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -108,7 +109,7 @@ func (p *ProgressTracker) render() {
 	eta := ""
 
 	if p.ShowETA && p.Current > 0 && p.Current < p.Total {
-		remaining := time.Duration(float64(elapsed) * (float64(p.Total) / float64(p.Current) - 1))
+		remaining := time.Duration(float64(elapsed) * (float64(p.Total)/float64(p.Current) - 1))
 		eta = fmt.Sprintf(" ETA: %s", formatDuration(remaining))
 	}
 
@@ -137,6 +138,7 @@ type SimpleSpinner struct {
 	current int
 	message string
 	active  bool
+	mu      sync.Mutex
 }
 
 // NewSimpleSpinner creates a new spinner
@@ -151,11 +153,20 @@ func NewSimpleSpinner(message string) *SimpleSpinner {
 
 // Start begins the spinner animation
 func (s *SimpleSpinner) Start() {
+	s.mu.Lock()
 	s.active = true
+	s.mu.Unlock()
+
 	go func() {
-		for s.active {
+		for {
+			s.mu.Lock()
+			if !s.active {
+				s.mu.Unlock()
+				break
+			}
 			fmt.Printf("\r%c %s", s.chars[s.current], s.message)
 			s.current = (s.current + 1) % len(s.chars)
+			s.mu.Unlock()
 			time.Sleep(100 * time.Millisecond)
 		}
 	}()
@@ -163,11 +174,144 @@ func (s *SimpleSpinner) Start() {
 
 // Stop stops the spinner animation
 func (s *SimpleSpinner) Stop() {
+	s.mu.Lock()
 	s.active = false
+	s.mu.Unlock()
 	fmt.Print("\r") // Clear the line
 }
 
 // UpdateMessage updates the spinner message
 func (s *SimpleSpinner) UpdateMessage(message string) {
+	s.mu.Lock()
 	s.message = message
+	s.mu.Unlock()
+}
+
+// BatchProgressTracker handles progress tracking for batch operations
+type BatchProgressTracker struct {
+	*ProgressTracker
+	BatchSize        int
+	ProcessedBatches int
+	TotalBatches     int
+	CurrentBatch     []interface{}
+}
+
+// NewBatchProgressTracker creates a new batch progress tracker
+func NewBatchProgressTracker(total int, batchSize int, message string) *BatchProgressTracker {
+	totalBatches := (total + batchSize - 1) / batchSize // Ceiling division
+	return &BatchProgressTracker{
+		ProgressTracker:  NewProgressTracker(total, message),
+		BatchSize:        batchSize,
+		ProcessedBatches: 0,
+		TotalBatches:     totalBatches,
+		CurrentBatch:     make([]interface{}, 0, batchSize),
+	}
+}
+
+// AddToBatch adds an item to the current batch
+func (b *BatchProgressTracker) AddToBatch(item interface{}) {
+	b.CurrentBatch = append(b.CurrentBatch, item)
+}
+
+// ProcessBatch processes the current batch and updates progress
+func (b *BatchProgressTracker) ProcessBatch(processor func([]interface{}) error) error {
+	if len(b.CurrentBatch) == 0 {
+		return nil
+	}
+
+	err := processor(b.CurrentBatch)
+	if err != nil {
+		return err
+	}
+
+	b.ProcessedBatches++
+	b.Current += len(b.CurrentBatch)
+	b.CurrentBatch = b.CurrentBatch[:0] // Clear batch
+
+	// Update progress message
+	batchMessage := fmt.Sprintf("%s (batch %d/%d)", b.Message, b.ProcessedBatches, b.TotalBatches)
+	b.Update(b.Current, batchMessage)
+
+	return nil
+}
+
+// MultiStageProgressTracker handles progress across multiple stages
+type MultiStageProgressTracker struct {
+	stages       []ProgressStage
+	currentStage int
+	totalWeight  int
+	completed    int
+}
+
+// ProgressStage represents a stage in multi-stage processing
+type ProgressStage struct {
+	Name    string
+	Weight  int // Relative weight of this stage
+	Total   int // Total items in this stage
+	Current int // Current progress in this stage
+}
+
+// NewMultiStageProgressTracker creates a new multi-stage progress tracker
+func NewMultiStageProgressTracker(stages []ProgressStage) *MultiStageProgressTracker {
+	totalWeight := 0
+	for _, stage := range stages {
+		totalWeight += stage.Weight
+	}
+
+	return &MultiStageProgressTracker{
+		stages:       stages,
+		currentStage: 0,
+		totalWeight:  totalWeight,
+		completed:    0,
+	}
+}
+
+// UpdateStage updates progress for the current stage
+func (m *MultiStageProgressTracker) UpdateStage(current int, message string) {
+	if m.currentStage >= len(m.stages) {
+		return
+	}
+
+	m.stages[m.currentStage].Current = current
+
+	// Calculate overall progress
+	overallProgress := 0
+	for i, stage := range m.stages {
+		if i < m.currentStage {
+			overallProgress += stage.Weight
+		} else if i == m.currentStage {
+			stageProgress := 0
+			if stage.Total > 0 {
+				stageProgress = (stage.Current * stage.Weight) / stage.Total
+			}
+			overallProgress += stageProgress
+		}
+	}
+
+	percentage := float64(overallProgress) / float64(m.totalWeight) * 100
+
+	stageMessage := fmt.Sprintf("[%s] %s", m.stages[m.currentStage].Name, message)
+	fmt.Printf("\r%s (%.1f%% complete)", stageMessage, percentage)
+}
+
+// NextStage moves to the next stage
+func (m *MultiStageProgressTracker) NextStage() {
+	if m.currentStage < len(m.stages)-1 {
+		m.currentStage++
+	}
+}
+
+// Finish completes all stages
+func (m *MultiStageProgressTracker) Finish(message string) {
+	fmt.Printf("\r%s (100%% complete)\n", message)
+}
+
+// GetStages returns the stages
+func (m *MultiStageProgressTracker) GetStages() []ProgressStage {
+	return m.stages
+}
+
+// GetTotalWeight returns the total weight
+func (m *MultiStageProgressTracker) GetTotalWeight() int {
+	return m.totalWeight
 }

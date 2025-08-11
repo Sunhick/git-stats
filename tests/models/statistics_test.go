@@ -4,9 +4,9 @@
 package models_test
 
 import (
+	"git-stats/models"
 	"testing"
 	"time"
-	"git-stats/models"
 )
 
 func TestAnalysisResult(t *testing.T) {
@@ -102,8 +102,8 @@ func TestAnalysisResult(t *testing.T) {
 
 func TestContributionGraph(t *testing.T) {
 	graph := &models.ContributionGraph{
-		StartDate:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		EndDate:      time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
+		StartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		EndDate:   time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
 		DailyCommits: map[string]int{
 			"2024-01-01": 3,
 			"2024-01-02": 1,

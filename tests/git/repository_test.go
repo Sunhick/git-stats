@@ -4,9 +4,9 @@
 package git_test
 
 import (
+	"git-stats/git"
 	"testing"
 	"time"
-	"git-stats/git"
 )
 
 // MockRepository implements the Repository interface for testing

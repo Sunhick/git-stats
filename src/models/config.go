@@ -7,9 +7,9 @@ package models
 
 // AnalysisConfig contains configuration for statistical analysis
 type AnalysisConfig struct {
-	TimeRange    TimeRange
-	AuthorFilter string
-	Limit        int
+	TimeRange     TimeRange
+	AuthorFilter  string
+	Limit         int
 	IncludeMerges bool
 }
 

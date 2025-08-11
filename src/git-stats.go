@@ -21,9 +21,9 @@
 package main
 
 import (
-	"git-stats/actions"
 	"flag"
 	"fmt"
+	"git-stats/actions"
 )
 
 func main() {

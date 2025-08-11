@@ -4,9 +4,9 @@
 package utils_test
 
 import (
+	"git-stats/utils"
 	"testing"
 	"time"
-	"git-stats/utils"
 )
 
 func TestParseDate(t *testing.T) {
@@ -141,6 +141,112 @@ func TestGetDateRange(t *testing.T) {
 			if start.After(end) {
 				t.Errorf("For input '%s', start date %v should be before end date %v", tc.input, start, end)
 			}
+		}
+	}
+}
+
+func TestValidateDateRange(t *testing.T) {
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	// Valid range
+	err := utils.ValidateDateRange(start, end)
+	if err != nil {
+		t.Errorf("Expected no error for valid date range, got: %v", err)
+	}
+
+	// Invalid range (start after end)
+	err = utils.ValidateDateRange(end, start)
+	if err == nil {
+		t.Error("Expected error for invalid date range (start after end)")
+	}
+}
+
+func TestGetContributionGraphDateRange(t *testing.T) {
+	endDate := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC) // A Saturday
+
+	start, end := utils.GetContributionGraphDateRange(endDate)
+
+	// Should be approximately 12 months ago
+	expectedStart := endDate.AddDate(-1, 0, 0)
+	if start.After(expectedStart.AddDate(0, 0, 7)) || start.Before(expectedStart.AddDate(0, 0, -7)) {
+		t.Errorf("Start date %v should be approximately 12 months before %v", start, endDate)
+	}
+
+	// Start should be a Sunday
+	if start.Weekday() != time.Sunday {
+		t.Errorf("Start date %v should be a Sunday, got %v", start, start.Weekday())
+	}
+
+	// End should be a Saturday
+	if end.Weekday() != time.Saturday {
+		t.Errorf("End date %v should be a Saturday, got %v", end, end.Weekday())
+	}
+}
+
+func TestGetWeekdayName(t *testing.T) {
+	testCases := []struct {
+		weekday  time.Weekday
+		expected string
+	}{
+		{time.Sunday, "Sunday"},
+		{time.Monday, "Monday"},
+		{time.Tuesday, "Tuesday"},
+		{time.Wednesday, "Wednesday"},
+		{time.Thursday, "Thursday"},
+		{time.Friday, "Friday"},
+		{time.Saturday, "Saturday"},
+	}
+
+	for _, tc := range testCases {
+		result := utils.GetWeekdayName(tc.weekday)
+		if result != tc.expected {
+			t.Errorf("For weekday %v, expected '%s', got '%s'", tc.weekday, tc.expected, result)
+		}
+	}
+}
+
+func TestIsWeekend(t *testing.T) {
+	testCases := []struct {
+		date     time.Time
+		expected bool
+	}{
+		{time.Date(2024, 1, 6, 0, 0, 0, 0, time.UTC), true},   // Saturday
+		{time.Date(2024, 1, 7, 0, 0, 0, 0, time.UTC), true},   // Sunday
+		{time.Date(2024, 1, 8, 0, 0, 0, 0, time.UTC), false},  // Monday
+		{time.Date(2024, 1, 9, 0, 0, 0, 0, time.UTC), false},  // Tuesday
+		{time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC), false}, // Wednesday
+		{time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC), false}, // Thursday
+		{time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC), false}, // Friday
+	}
+
+	for _, tc := range testCases {
+		result := utils.IsWeekend(tc.date)
+		if result != tc.expected {
+			t.Errorf("For date %v, expected %v, got %v", tc.date, tc.expected, result)
+		}
+	}
+}
+
+func TestGetQuarter(t *testing.T) {
+	testCases := []struct {
+		date     time.Time
+		expected int
+	}{
+		{time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC), 1},  // January
+		{time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC), 1},  // March
+		{time.Date(2024, 4, 15, 0, 0, 0, 0, time.UTC), 2},  // April
+		{time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC), 2},  // June
+		{time.Date(2024, 7, 15, 0, 0, 0, 0, time.UTC), 3},  // July
+		{time.Date(2024, 9, 15, 0, 0, 0, 0, time.UTC), 3},  // September
+		{time.Date(2024, 10, 15, 0, 0, 0, 0, time.UTC), 4}, // October
+		{time.Date(2024, 12, 15, 0, 0, 0, 0, time.UTC), 4}, // December
+	}
+
+	for _, tc := range testCases {
+		result := utils.GetQuarter(tc.date)
+		if result != tc.expected {
+			t.Errorf("For date %v, expected quarter %d, got %d", tc.date, tc.expected, result)
 		}
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"../src/models"
+	"git-stats/models"
 )
 
 func TestCommit_Validate(t *testing.T) {

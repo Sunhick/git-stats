@@ -4,9 +4,9 @@
 package cli_test
 
 import (
+	"git-stats/cli"
 	"testing"
 	"time"
-	"git-stats/cli"
 )
 
 // MockParser implements the Parser interface for testing

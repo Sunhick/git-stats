@@ -4,9 +4,9 @@
 package analyzers
 
 import (
-	"time"
 	"git-stats/git"
 	"git-stats/models"
+	"time"
 )
 
 // Analyzer interface for statistical analysis

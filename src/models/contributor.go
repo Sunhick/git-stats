@@ -9,30 +9,30 @@ import (
 
 // Contributor represents a comprehensive contributor profile
 type Contributor struct {
-	Name            string         `json:"name"`
-	Email           string         `json:"email"`
-	TotalCommits    int            `json:"total_commits"`
-	TotalInsertions int            `json:"total_insertions"`
-	TotalDeletions  int            `json:"total_deletions"`
-	FirstCommit     time.Time      `json:"first_commit"`
-	LastCommit      time.Time      `json:"last_commit"`
-	ActiveDays      int            `json:"active_days"`
-	CommitsByDay    map[string]int `json:"commits_by_day"` // date -> commit count
-	CommitsByHour   map[int]int    `json:"commits_by_hour"` // hour -> commit count
-	CommitsByWeekday map[int]int   `json:"commits_by_weekday"` // weekday -> commit count
-	FileTypes       map[string]int `json:"file_types"` // extension -> commit count
-	TopFiles        []string       `json:"top_files"` // most frequently modified files
+	Name             string         `json:"name"`
+	Email            string         `json:"email"`
+	TotalCommits     int            `json:"total_commits"`
+	TotalInsertions  int            `json:"total_insertions"`
+	TotalDeletions   int            `json:"total_deletions"`
+	FirstCommit      time.Time      `json:"first_commit"`
+	LastCommit       time.Time      `json:"last_commit"`
+	ActiveDays       int            `json:"active_days"`
+	CommitsByDay     map[string]int `json:"commits_by_day"`     // date -> commit count
+	CommitsByHour    map[int]int    `json:"commits_by_hour"`    // hour -> commit count
+	CommitsByWeekday map[int]int    `json:"commits_by_weekday"` // weekday -> commit count
+	FileTypes        map[string]int `json:"file_types"`         // extension -> commit count
+	TopFiles         []string       `json:"top_files"`          // most frequently modified files
 }
 
 // ContributorSummary provides a lightweight summary of contributor data
 type ContributorSummary struct {
-	Name         string    `json:"name"`
-	Email        string    `json:"email"`
-	Commits      int       `json:"commits"`
-	Percentage   float64   `json:"percentage"`
-	FirstCommit  time.Time `json:"first_commit"`
-	LastCommit   time.Time `json:"last_commit"`
-	IsActive     bool      `json:"is_active"` // active in last 3 months
+	Name        string    `json:"name"`
+	Email       string    `json:"email"`
+	Commits     int       `json:"commits"`
+	Percentage  float64   `json:"percentage"`
+	FirstCommit time.Time `json:"first_commit"`
+	LastCommit  time.Time `json:"last_commit"`
+	IsActive    bool      `json:"is_active"` // active in last 3 months
 }
 
 // Validate checks if the contributor data is valid

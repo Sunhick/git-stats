@@ -5,6 +5,7 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ErrorType represents different types of errors that can occur
@@ -101,4 +102,124 @@ func (e *GitStatsError) IsRecoverable() bool {
 	default:
 		return false
 	}
+}
+
+// GetSeverity returns the severity level of the error
+func (e *GitStatsError) GetSeverity() string {
+	switch e.Type {
+	case ErrNotGitRepository, ErrGitNotFound, ErrInvalidArguments:
+		return "ERROR"
+	case ErrInvalidDateFormat, ErrInvalidAuthor, ErrInvalidFormat:
+		return "WARNING"
+	case ErrRepositoryCorrupted, ErrPermissionDenied, ErrInsufficientMemory:
+		return "CRITICAL"
+	case ErrCommandTimeout, ErrFileNotFound:
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// FormatUserFriendlyError formats the error for display to users
+func (e *GitStatsError) FormatUserFriendlyError() string {
+	severity := e.GetSeverity()
+	suggestion := e.GetRecoverySuggestion()
+
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("[%s] %s\n", severity, e.Message))
+
+	if suggestion != "" {
+		output.WriteString(fmt.Sprintf("💡 Suggestion: %s\n", suggestion))
+	}
+
+	// Add context information if available
+	if len(e.Context) > 0 {
+		output.WriteString("📋 Details:\n")
+		for key, value := range e.Context {
+			output.WriteString(fmt.Sprintf("  • %s: %v\n", key, value))
+		}
+	}
+
+	return output.String()
+}
+
+// ErrorCollector collects multiple errors and provides summary
+type ErrorCollector struct {
+	errors   []error
+	warnings []error
+}
+
+// NewErrorCollector creates a new error collector
+func NewErrorCollector() *ErrorCollector {
+	return &ErrorCollector{
+		errors:   make([]error, 0),
+		warnings: make([]error, 0),
+	}
+}
+
+// AddError adds an error to the collector
+func (ec *ErrorCollector) AddError(err error) {
+	if gitErr, ok := err.(*GitStatsError); ok {
+		if gitErr.GetSeverity() == "WARNING" {
+			ec.warnings = append(ec.warnings, err)
+		} else {
+			ec.errors = append(ec.errors, err)
+		}
+	} else {
+		ec.errors = append(ec.errors, err)
+	}
+}
+
+// HasErrors returns true if there are any errors
+func (ec *ErrorCollector) HasErrors() bool {
+	return len(ec.errors) > 0
+}
+
+// HasWarnings returns true if there are any warnings
+func (ec *ErrorCollector) HasWarnings() bool {
+	return len(ec.warnings) > 0
+}
+
+// GetErrorCount returns the number of errors
+func (ec *ErrorCollector) GetErrorCount() int {
+	return len(ec.errors)
+}
+
+// GetWarningCount returns the number of warnings
+func (ec *ErrorCollector) GetWarningCount() int {
+	return len(ec.warnings)
+}
+
+// GetSummary returns a summary of all collected errors and warnings
+func (ec *ErrorCollector) GetSummary() string {
+	var output strings.Builder
+
+	if len(ec.errors) > 0 {
+		output.WriteString(fmt.Sprintf("❌ %d error(s) occurred:\n", len(ec.errors)))
+		for i, err := range ec.errors {
+			if gitErr, ok := err.(*GitStatsError); ok {
+				output.WriteString(fmt.Sprintf("%d. %s\n", i+1, gitErr.FormatUserFriendlyError()))
+			} else {
+				output.WriteString(fmt.Sprintf("%d. %s\n", i+1, err.Error()))
+			}
+		}
+	}
+
+	if len(ec.warnings) > 0 {
+		output.WriteString(fmt.Sprintf("⚠️  %d warning(s):\n", len(ec.warnings)))
+		for i, warning := range ec.warnings {
+			if gitErr, ok := warning.(*GitStatsError); ok {
+				output.WriteString(fmt.Sprintf("%d. %s\n", i+1, gitErr.FormatUserFriendlyError()))
+			} else {
+				output.WriteString(fmt.Sprintf("%d. %s\n", i+1, warning.Error()))
+			}
+		}
+	}
+
+	return output.String()
+}
+
+// WrapError wraps a standard error as a GitStatsError
+func WrapError(err error, errType ErrorType, message string) *GitStatsError {
+	return NewGitStatsError(errType, message, err)
 }

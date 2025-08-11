@@ -4,9 +4,9 @@
 package utils_test
 
 import (
+	"git-stats/utils"
 	"testing"
 	"time"
-	"git-stats/utils"
 )
 
 func TestNewProgressTracker(t *testing.T) {
@@ -121,4 +121,106 @@ func TestNewSimpleSpinner(t *testing.T) {
 
 	// Test updating message
 	spinner.UpdateMessage("New message")
+}
+
+func TestNewBatchProgressTracker(t *testing.T) {
+	tracker := utils.NewBatchProgressTracker(100, 10, "Processing batches")
+
+	if tracker.BatchSize != 10 {
+		t.Errorf("Expected batch size 10, got %d", tracker.BatchSize)
+	}
+
+	if tracker.TotalBatches != 10 {
+		t.Errorf("Expected total batches 10, got %d", tracker.TotalBatches)
+	}
+
+	if tracker.ProcessedBatches != 0 {
+		t.Errorf("Expected processed batches 0, got %d", tracker.ProcessedBatches)
+	}
+}
+
+func TestBatchProgressTrackerAddToBatch(t *testing.T) {
+	tracker := utils.NewBatchProgressTracker(100, 10, "Processing")
+
+	tracker.AddToBatch("item1")
+	tracker.AddToBatch("item2")
+
+	if len(tracker.CurrentBatch) != 2 {
+		t.Errorf("Expected current batch size 2, got %d", len(tracker.CurrentBatch))
+	}
+}
+
+func TestBatchProgressTrackerProcessBatch(t *testing.T) {
+	tracker := utils.NewBatchProgressTracker(100, 10, "Processing")
+
+	// Add items to batch
+	tracker.AddToBatch("item1")
+	tracker.AddToBatch("item2")
+	tracker.AddToBatch("item3")
+
+	// Process batch
+	processed := 0
+	err := tracker.ProcessBatch(func(items []interface{}) error {
+		processed = len(items)
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("Unexpected error processing batch: %v", err)
+	}
+
+	if processed != 3 {
+		t.Errorf("Expected 3 items processed, got %d", processed)
+	}
+
+	if tracker.ProcessedBatches != 1 {
+		t.Errorf("Expected 1 processed batch, got %d", tracker.ProcessedBatches)
+	}
+
+	if tracker.Current != 3 {
+		t.Errorf("Expected current progress 3, got %d", tracker.Current)
+	}
+
+	if len(tracker.CurrentBatch) != 0 {
+		t.Errorf("Expected current batch to be cleared, got %d items", len(tracker.CurrentBatch))
+	}
+}
+
+func TestNewMultiStageProgressTracker(t *testing.T) {
+	stages := []utils.ProgressStage{
+		{Name: "Stage 1", Weight: 30, Total: 100},
+		{Name: "Stage 2", Weight: 50, Total: 200},
+		{Name: "Stage 3", Weight: 20, Total: 50},
+	}
+
+	tracker := utils.NewMultiStageProgressTracker(stages)
+
+	if len(tracker.GetStages()) != 3 {
+		t.Errorf("Expected 3 stages, got %d", len(tracker.GetStages()))
+	}
+
+	if tracker.GetTotalWeight() != 100 {
+		t.Errorf("Expected total weight 100, got %d", tracker.GetTotalWeight())
+	}
+}
+
+func TestMultiStageProgressTrackerUpdateStage(t *testing.T) {
+	stages := []utils.ProgressStage{
+		{Name: "Stage 1", Weight: 50, Total: 100},
+		{Name: "Stage 2", Weight: 50, Total: 100},
+	}
+
+	tracker := utils.NewMultiStageProgressTracker(stages)
+
+	// Update first stage to 50% complete
+	tracker.UpdateStage(50, "Processing stage 1")
+
+	// Move to next stage
+	tracker.NextStage()
+
+	// Update second stage to 25% complete
+	tracker.UpdateStage(25, "Processing stage 2")
+
+	// Test that we can finish
+	tracker.Finish("All stages complete")
 }
