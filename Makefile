@@ -58,6 +58,11 @@ test-cli:
 	${E} "Running CLI tests..."
 	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./cli/
 
+.PHONY: test-analyzers
+test-analyzers:
+	${E} "Running analyzer tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./analyzers/
+
 .PHONY: test-coverage
 test-coverage: test
 	${E} "Generating coverage report..."
@@ -68,6 +73,33 @@ test-coverage: test
 test-integration:
 	${E} "Running integration tests..."
 	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./utils/integration_test.go ./utils/date_test.go ./utils/errors_test.go ./utils/progress_test.go
+
+# Individual analyzer test targets
+.PHONY: test-contribution
+test-contribution:
+	${E} "Running contribution analyzer tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./analyzers/contribution_test.go
+
+.PHONY: test-statistics
+test-statistics:
+	${E} "Running statistics analyzer tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./analyzers/statistics_test.go
+
+.PHONY: test-health
+test-health:
+	${E} "Running health analyzer tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./analyzers/health_test.go
+
+# Benchmark targets
+.PHONY: bench
+bench:
+	${E} "Running benchmarks..."
+	${Q} cd $(TEST_DIR) && ${GO} test -bench=. -benchmem ./analyzers/
+
+.PHONY: bench-analyzers
+bench-analyzers:
+	${E} "Running analyzer benchmarks..."
+	${Q} cd $(TEST_DIR) && ${GO} test -bench=Benchmark -benchmem ./analyzers/
 
 # Development targets
 .PHONY: run
@@ -84,6 +116,21 @@ run-summary: ${TARGET}
 run-contrib: ${TARGET}
 	${E} "Running $(TARGET) with contribution graph..."
 	${Q} ./${TARGET} -contrib
+
+.PHONY: run-health
+run-health: ${TARGET}
+	${E} "Running $(TARGET) with health analysis..."
+	${Q} ./${TARGET} -health
+
+.PHONY: run-detailed
+run-detailed: ${TARGET}
+	${E} "Running $(TARGET) with detailed statistics..."
+	${Q} ./${TARGET} -detailed
+
+.PHONY: run-files
+run-files: ${TARGET}
+	${E} "Running $(TARGET) with file statistics..."
+	${Q} ./${TARGET} -files
 
 .PHONY: dev
 dev:
@@ -176,11 +223,20 @@ help:
 	${E} "  test-models    - Run model tests"
 	${E} "  test-git       - Run git tests"
 	${E} "  test-cli       - Run CLI tests"
+	${E} "  test-analyzers - Run analyzer tests"
+	${E} "  test-contribution - Run contribution analyzer tests"
+	${E} "  test-statistics - Run statistics analyzer tests"
+	${E} "  test-health    - Run health analyzer tests"
 	${E} "  test-coverage  - Run tests with coverage report"
 	${E} "  test-integration - Run integration tests"
+	${E} "  bench          - Run all benchmarks"
+	${E} "  bench-analyzers - Run analyzer benchmarks"
 	${E} "  run            - Build and run the application"
 	${E} "  run-summary    - Run with summary flag"
 	${E} "  run-contrib    - Run with contribution graph flag"
+	${E} "  run-health     - Run with health analysis flag"
+	${E} "  run-detailed   - Run with detailed statistics flag"
+	${E} "  run-files      - Run with file statistics flag"
 	${E} "  dev            - Run in development mode"
 	${E} "  fmt            - Format Go code"
 	${E} "  vet            - Run go vet"
