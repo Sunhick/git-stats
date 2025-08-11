@@ -21,7 +21,7 @@
 package main
 
 import (
-	actions "./actions"
+	"git-stats/actions"
 	"flag"
 	"fmt"
 )

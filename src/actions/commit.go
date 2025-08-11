@@ -21,21 +21,20 @@
 package actions
 
 import (
-	"fmt"
 	"time"
 )
 
 type Commit struct {
 	commitMessage string
 	committer     string
-	commitDate    Date
+	commitDate    time.Time
 	author        string
-	authorDate    Date
+	authorDate    time.Time
 	tree          string
 }
 
 // committer and author are one and the same
-func makeCommit(commitMessage string, author string, when Date, tree string) Commit {
+func makeCommit(commitMessage string, author string, when time.Time, tree string) Commit {
 	return Commit{commitMessage: commitMessage, committer: author,
 		commitDate: when, author: author, authorDate: when, tree: tree}
 }
