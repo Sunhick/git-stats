@@ -1,13 +1,19 @@
 // Copyright (c) 2019 Sunil
 // Enhanced git-stats tool - Tests for NCurses GUI interface
 
+//go:build gui
+// +build gui
+
 package visualizers
 
 import (
 	"git-stats/models"
 	"git-stats/visualizers"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 // TestGUIState tests the GUI state management
@@ -255,6 +261,223 @@ func TestStateTransitions(t *testing.T) {
 	state.ToggleHelp()
 	if state.ShowHelp == originalHelp {
 		t.Error("Expected help state to change after ToggleHelp")
+	}
+}
+
+// Test enhanced widget functionality
+func TestDetailPanelWidgetEnhanced(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Create detail panel widget
+	detailPanel := visualizers.NewDetailPanelWidget(state, "Test Details")
+
+	// Test initial state
+	if !detailPanel.ShowDetails {
+		t.Error("Expected ShowDetails to be true initially")
+	}
+
+	if detailPanel.SelectedCommitIndex != 0 {
+		t.Error("Expected SelectedCommitIndex to be 0 initially")
+	}
+
+	// Test content update
+	detailPanel.UpdateContent()
+	content := detailPanel.GetText(true)
+	if content == "" {
+		t.Error("Expected content to be generated")
+	}
+
+	// Test details toggle
+	detailPanel.ShowDetails = false
+	detailPanel.UpdateContent()
+	contentWithoutDetails := detailPanel.GetText(true)
+	if contentWithoutDetails == content {
+		t.Error("Expected content to change when ShowDetails is toggled")
+	}
+}
+
+func TestStatusBarWidgetEnhanced(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Create status bar widget
+	statusBar := visualizers.NewStatusBarWidget(state)
+
+	// Test initial state
+	if !statusBar.ShowShortcuts {
+		t.Error("Expected ShowShortcuts to be true initially")
+	}
+
+	if statusBar.HelpText == "" {
+		t.Error("Expected HelpText to be set")
+	}
+
+	// Test status update
+	statusBar.UpdateStatus()
+	content := statusBar.GetText(true)
+	if content == "" {
+		t.Error("Expected status content to be generated")
+	}
+
+	// Test shortcuts toggle
+	statusBar.ToggleShortcuts()
+	if statusBar.ShowShortcuts {
+		t.Error("Expected ShowShortcuts to be false after toggle")
+	}
+
+	statusBar.UpdateStatus()
+	contentWithoutShortcuts := statusBar.GetText(true)
+	if contentWithoutShortcuts == content {
+		t.Error("Expected content to change when shortcuts are toggled")
+	}
+}
+
+func TestKeyboardInputHandling(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Create widgets
+	detailPanel := visualizers.NewDetailPanelWidget(state, "Test Details")
+	statusBar := visualizers.NewStatusBarWidget(state)
+
+	// Add some test commits to state
+	testCommits := []models.Commit{
+		{
+			Hash:    "abc123",
+			Message: "Test commit 1",
+			Author:  models.Author{Name: "Test User", Email: "test@example.com"},
+			AuthorDate: time.Now(),
+			Stats:   models.CommitStats{FilesChanged: 1, Insertions: 10, Deletions: 5},
+		},
+		{
+			Hash:    "def456",
+			Message: "Test commit 2",
+			Author:  models.Author{Name: "Test User", Email: "test@example.com"},
+			AuthorDate: time.Now().Add(-time.Hour),
+			Stats:   models.CommitStats{FilesChanged: 2, Insertions: 20, Deletions: 10},
+		},
+	}
+	state.SelectedCommits = testCommits
+
+	// Test detail panel input handling
+	testCases := []struct {
+		name     string
+		key      tcell.Key
+		rune     rune
+		expected int
+	}{
+		{"Down arrow", tcell.KeyDown, 0, 1},
+		{"Up arrow", tcell.KeyUp, 0, 0},
+		{"j key", tcell.KeyRune, 'j', 1},
+		{"k key", tcell.KeyRune, 'k', 0},
+		{"Page down", tcell.KeyPageDown, 0, 1},
+		{"Page up", tcell.KeyPageUp, 0, 0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			event := tcell.NewEventKey(tc.key, tc.rune, tcell.ModNone)
+			detailPanel.HandleInput(event)
+
+			if detailPanel.SelectedCommitIndex != tc.expected {
+				t.Errorf("Expected SelectedCommitIndex to be %d, got %d", tc.expected, detailPanel.SelectedCommitIndex)
+			}
+		})
+	}
+
+	// Test details toggle
+	initialShowDetails := detailPanel.ShowDetails
+	event := tcell.NewEventKey(tcell.KeyRune, 'd', tcell.ModNone)
+	detailPanel.HandleInput(event)
+
+	if detailPanel.ShowDetails == initialShowDetails {
+		t.Error("Expected ShowDetails to toggle")
+	}
+}
+
+func TestWidgetInteractions(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Create widgets
+	detailPanel := visualizers.NewDetailPanelWidget(state, "Test Details")
+	statusBar := visualizers.NewStatusBarWidget(state)
+
+	// Test state changes affect widgets
+	originalView := state.CurrentView
+	state.SwitchView(visualizers.StatisticsView)
+
+	// Update widgets
+	detailPanel.UpdateContent()
+	statusBar.UpdateStatus()
+
+	// Verify content changed
+	detailContent := detailPanel.GetText(true)
+	statusContent := statusBar.GetText(true)
+
+	if detailContent == "" {
+		t.Error("Expected detail panel content to be updated")
+	}
+
+	if statusContent == "" {
+		t.Error("Expected status bar content to be updated")
+	}
+
+	// Verify status bar shows current view
+	if !strings.Contains(statusContent, "Statistics") {
+		t.Error("Expected status bar to show current view")
+	}
+
+	// Reset state
+	state.SwitchView(originalView)
+}
+
+func TestKeyBindings(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+	statusBar := visualizers.NewStatusBarWidget(state)
+
+	// Test that key commands are properly defined
+	if len(statusBar.Commands) == 0 {
+		t.Error("Expected key commands to be defined")
+	}
+
+	// Test relevant commands for different views
+	state.SwitchView(visualizers.ContributionView)
+	relevantCommands := statusBar.GetRelevantCommands()
+
+	if len(relevantCommands) == 0 {
+		t.Error("Expected relevant commands for contribution view")
+	}
+
+	// Check for navigation commands in contribution view
+	hasNavigation := false
+	for _, cmd := range relevantCommands {
+		if strings.Contains(cmd.Description, "Days") || strings.Contains(cmd.Description, "Weeks") {
+			hasNavigation = true
+			break
+		}
+	}
+
+	if !hasNavigation {
+		t.Error("Expected navigation commands for contribution view")
+	}
+
+	// Test other views
+	views := []visualizers.ViewType{
+		visualizers.StatisticsView,
+		visualizers.ContributorsView,
+		visualizers.HealthView,
+	}
+
+	for _, view := range views {
+		state.SwitchView(view)
+		relevantCommands := statusBar.GetRelevantCommands()
+
+		if len(relevantCommands) == 0 {
+			t.Errorf("Expected relevant commands for %s view", view.String())
+		}
 	}
 }
 

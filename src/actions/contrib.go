@@ -23,6 +23,7 @@ package actions
 import (
 	"fmt"
 	"git-stats/analyzers"
+	"git-stats/cli"
 	"git-stats/git"
 	"git-stats/models"
 	"git-stats/visualizers"
@@ -31,6 +32,10 @@ import (
 )
 
 func Contrib() {
+	ContribWithConfig(nil)
+}
+
+func ContribWithConfig(config *cli.Config) {
 	fmt.Println("Git Contribution Graph")
 	fmt.Println("======================")
 
@@ -88,7 +93,7 @@ func Contrib() {
 	modelCommits := convertGitCommitsToModelCommits(commits)
 
 	// Create analysis configuration
-	config := models.AnalysisConfig{
+	analysisConfig := models.AnalysisConfig{
 		TimeRange: models.TimeRange{
 			Start: startDate,
 			End:   endDate,
@@ -99,7 +104,7 @@ func Contrib() {
 
 	// Analyze contributions
 	contribAnalyzer := analyzers.NewContributionAnalyzer()
-	contribGraph, err := contribAnalyzer.AnalyzeContributions(modelCommits, config)
+	contribGraph, err := contribAnalyzer.AnalyzeContributions(modelCommits, analysisConfig)
 	if err != nil {
 		fmt.Printf("Error analyzing contributions: %v\n", err)
 		return
@@ -116,6 +121,19 @@ func Contrib() {
 
 	// Create contribution graph renderer and display
 	contribRenderer := visualizers.NewContributionGraphRenderer(renderConfig)
+
+	// Configure colors based on CLI options
+	useColors := true
+	colorTheme := "github"
+
+	if config != nil {
+		useColors = !config.NoColor
+		if config.ColorTheme != "" {
+			colorTheme = config.ColorTheme
+		}
+	}
+
+	contribRenderer.SetColorOptions(useColors, colorTheme)
 
 	// Render contribution graph
 	graphOutput, err := contribRenderer.RenderContributionGraph(contribGraph, renderConfig)
@@ -156,5 +174,7 @@ func Contrib() {
 
 	fmt.Printf("\nNote: Showing activity for the last 365 days\n")
 }
+
+
 
 

@@ -9,7 +9,10 @@ Enhanced terminal git statistics utility with comprehensive analysis and visuali
 - **Health Metrics**: Repository health scoring with activity trends and growth analysis
 - **Multiple Output Formats**: Terminal, JSON, CSV, and interactive visualizations
 - **Advanced Filtering**: Time range, author, and merge commit filtering
-- **Performance Optimized**: Efficient algorithms for large repositories
+- **Interactive GUI**: Full-screen ncurses interface with keyboard navigation
+- **Comprehensive CLI**: Robust command-line interface with intelligent error handling
+- **Flexible Date Parsing**: Support for absolute and relative date formats
+- **Performance Optimized**: Efficient algorithms for large repositories with progress indicators
 
 ## Architecture
 
@@ -21,8 +24,29 @@ The application is built with a modular architecture:
   - Contribution Analyzer: Activity graphs and streak calculations
   - Statistics Analyzer: Commit patterns and file statistics
   - Health Analyzer: Repository health metrics and trends
-- **CLI**: Command-line interface and output formatting
-- **Visualization**: Terminal-based charts and graphs
+- **CLI**: Comprehensive command-line interface with validation and error handling
+  - Parser: Robust argument parsing with comprehensive flag support
+  - Validator: Input validation for dates, authors, formats, and repository paths
+  - Error Handling: Contextual error messages with helpful suggestions
+- **Visualization**: Terminal-based charts and interactive ncurses GUI
+- **Formatters**: Multiple output format support (terminal, JSON, CSV)
+
+## Quick Start
+
+```shell
+# Clone and build
+$ git clone <repository-url>
+$ cd git-stats
+$ make build
+
+# Show help
+$ ./git-stats -help
+
+# Basic usage (run from any git repository)
+$ ./git-stats                    # Show contribution graph
+$ ./git-stats -summary           # Show repository summary
+$ ./git-stats -gui               # Launch interactive GUI
+```
 
 ## Build & Install
 
@@ -35,18 +59,23 @@ $ make install
 
 # Or build and run directly
 $ make run
+
+# Run specific commands
+$ make run-contrib    # Test contribution graph
+$ make run-summary    # Test repository summary
 ```
 
 ## Development
 
 ```shell
-# Run tests
+# Run all tests
 $ make test
 
 # Run specific test suites
-$ make test-analyzers
-$ make test-models
-$ make test-git
+$ make test-cli          # Test CLI parser and validator
+$ make test-analyzers    # Test analysis engines
+$ make test-models       # Test data models
+$ make test-git          # Test git operations
 
 # Run with coverage
 $ make test-coverage
@@ -56,6 +85,11 @@ $ make check
 
 # Development mode (auto-rebuild)
 $ make dev
+
+# Run specific commands for testing
+$ make run-contrib       # Test contribution graph
+$ make run-summary       # Test repository summary
+$ make run-health        # Test health analysis
 ```
 
 ## Usage
@@ -65,66 +99,135 @@ After building, you can add the folder containing `git-stats` to your PATH varia
 ### Basic Usage
 
 ```shell
-# Show repository summary
-$ git stats
+# Show contribution graph (default)
+$ git-stats
 
-# Show contribution graph
-$ git stats --contrib
+# Show detailed repository statistics
+$ git-stats -summary
 
-# Show detailed statistics
-$ git stats --detailed
+# Show contributor statistics
+$ git-stats -contributors
 
-# Filter by author
-$ git stats --author="John Doe"
+# Show repository health metrics
+$ git-stats -health
 
-# Filter by time range
-$ git stats --since="2024-01-01" --until="2024-12-31"
-
-# Export to JSON
-$ git stats --format=json --output=stats.json
+# Launch interactive GUI
+$ git-stats -gui
 ```
 
-### Advanced Analysis
+### Date and Author Filtering
 
 ```shell
-# Repository health analysis
-$ git stats --health
+# Filter by date range
+$ git-stats -contrib -since "2024-01-01" -until "2024-12-31"
 
-# File statistics
-$ git stats --files
+# Use relative dates
+$ git-stats -summary -since "1 month ago"
+$ git-stats -health -since "yesterday" -until "today"
 
-# Time-based patterns
-$ git stats --patterns
+# Filter by author
+$ git-stats -contributors -author "john"
+$ git-stats -contrib -author "john@example.com"
+```
 
-# Exclude merge commits
-$ git stats --no-merges
+### Output Formats
 
-# Interactive mode
-$ git stats --interactive
+```shell
+# Export to JSON
+$ git-stats -summary -format json
+
+# Export to CSV
+$ git-stats -contributors -format csv
+
+# Save to file
+$ git-stats -summary -format json -output report.json
+```
+
+### Advanced Options
+
+```shell
+# Show progress for large repositories
+$ git-stats -summary -progress
+
+# Limit commits processed
+$ git-stats -contrib -limit 5000
+
+# Analyze specific repository
+$ git-stats -summary /path/to/repo
+
+# Combine multiple options
+$ git-stats -summary -since "1 year ago" -author "john" -format json -progress
 ```
 
 ## Command Line Options
 
-| Flag              | Description                         |
-| ----------------- | ----------------------------------- |
-| `--summary`       | Show repository summary (default)   |
-| `--contrib`       | Display contribution graph          |
-| `--detailed`      | Show detailed statistics            |
-| `--health`        | Repository health analysis          |
-| `--files`         | File and file type statistics       |
-| `--patterns`      | Time-based commit patterns          |
-| `--author=NAME`   | Filter by author name or email      |
-| `--since=DATE`    | Start date for analysis             |
-| `--until=DATE`    | End date for analysis               |
-| `--no-merges`     | Exclude merge commits               |
-| `--format=FORMAT` | Output format (terminal, json, csv) |
-| `--output=FILE`   | Output file path                    |
-| `--interactive`   | Interactive mode                    |
+### Commands
+| Flag            | Description                         |
+| --------------- | ----------------------------------- |
+| `-contrib`      | Show contribution graph (default)   |
+| `-summary`      | Show detailed repository statistics |
+| `-contributors` | Show contributor statistics         |
+| `-health`       | Repository health analysis          |
+| `-gui`          | Launch interactive ncurses GUI      |
+
+### Filtering Options
+| Flag             | Description                    |
+| ---------------- | ------------------------------ |
+| `-since <date>`  | Show commits since date        |
+| `-until <date>`  | Show commits until date        |
+| `-author <name>` | Filter by author name or email |
+
+### Output Options
+| Flag             | Description                         |
+| ---------------- | ----------------------------------- |
+| `-format <fmt>`  | Output format (terminal, json, csv) |
+| `-output <file>` | Output file path                    |
+| `-progress`      | Show progress indicators            |
+
+### Performance Options
+| Flag         | Description                        |
+| ------------ | ---------------------------------- |
+| `-limit <n>` | Limit number of commits to process |
+
+### Other Options
+| Flag        | Description           |
+| ----------- | --------------------- |
+| `-help, -h` | Show help information |
+
+## Date Formats
+
+The tool supports both absolute and relative date formats:
+
+**Absolute Dates:**
+- `2024-01-15`
+- `2024-01-15 14:30:00`
+- `01/15/2024`
+- `15-01-2024`
+
+**Relative Dates:**
+- `today`
+- `yesterday`
+- `1 week ago`
+- `2 months ago`
+- `1 year ago`
+
+## Author Matching
+
+Author filtering supports:
+- Partial name matching: `"john"`
+- Email matching: `"john@example.com"`
+- Full name matching: `"John Doe"`
 
 ## Output Examples
 
 ### Contribution Graph
-```
+```bash
+$ git-stats -contrib
+Git Contribution Graph
+======================
+Repository: my-project
+Total Commits: 247
+
 Contributions in the last year:
     Jan  Feb  Mar  Apr  May  Jun  Jul  Aug  Sep  Oct  Nov  Dec
 Mon ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
@@ -137,25 +240,48 @@ Longest streak: 23 days
 Total contributions: 247
 ```
 
-### Repository Health
-```
-Repository Health Score: 85/100
+### Repository Summary
+```bash
+$ git-stats -summary
+Git Repository Summary
+======================
+Repository: my-project
+Path: /path/to/my-project
+Total Commits: 247
+First Commit: 2024-01-15 09:30:00
+Last Commit: 2024-08-10 16:45:00
+Branches: 3
 
-✅ High commit frequency (1.2 commits/day)
-✅ Good contributor diversity (5 active contributors)
-✅ Activity trending upward
-⚠️  Repository age: 6 months (still maturing)
+Active Contributors: 5
+Most Active: john@example.com (89 commits)
 ```
 
-### File Statistics
-```
-Top Files by Commits:
-1. src/main.go          (45 commits, 1,234 lines)
-2. README.md            (23 commits, 456 lines)
-3. src/analyzer.go      (19 commits, 789 lines)
+### Help System
+```bash
+$ git-stats -help
+Git Stats - Enhanced Git Repository Analysis Tool
 
-Top File Types:
-1. .go     (156 commits, 12,345 lines, 23 files)
-2. .md     (34 commits, 2,456 lines, 8 files)
-3. .json   (12 commits, 567 lines, 4 files)
+Usage: git-stats [options] [repository-path]
+
+Commands:
+  -contrib         Show git contribution graph (GitHub-style) [default]
+  -summary         Show detailed repository statistics
+  -contributors    Show contributor statistics
+  -health          Show repository health metrics
+  -gui             Launch interactive ncurses GUI
+
+[... detailed help with examples ...]
+```
+
+### Error Handling with Suggestions
+```bash
+$ git-stats -since "invalid-date"
+Error: invalid since date 'invalid-date': unable to parse date...
+
+Suggestion: Use a valid date format. Supported formats:
+  - Absolute: 2024-01-15, 2024-01-15 14:30:00, 01/15/2024
+  - Relative: today, yesterday, 1 week ago, 2 months ago
+Example: git-stats -since "2024-01-01" -until "2024-12-31"
+
+For more help, run: git-stats -help
 ```

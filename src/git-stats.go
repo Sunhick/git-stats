@@ -21,40 +21,64 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"git-stats/actions"
+	"git-stats/cli"
+	"os"
 )
 
 func main() {
-	summary := flag.Bool("summarize", false, "Summarize the git commits and repository statistics")
-	contrib := flag.Bool("contrib", false, "Show git contribution graph (GitHub-style)")
-	help := flag.Bool("help", false, "Show help information")
+	// Create validator and parser
+	validator := cli.NewCLIValidator()
+	parser := cli.NewCLIParser(validator)
 
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Git Stats - Enhanced Git Repository Analysis Tool\n\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options]\n\n", "git-stats")
-		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  git-stats -summarize    # Show detailed repository statistics\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  git-stats -contrib      # Show contribution graph\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "\nMake sure to run this command from within a git repository.\n")
+	// Parse command line arguments
+	config, err := parser.Parse(os.Args[1:])
+	if err != nil {
+		parser.PrintErrorWithSuggestion(err)
+		os.Exit(1)
 	}
 
-	flag.Parse()
-
-	// Show help if requested or no flags provided
-	if *help || (!*summary && !*contrib) {
-		flag.Usage()
+	// Handle help request
+	if config.ShowHelp {
+		parser.PrintHelp()
 		return
 	}
 
-	if *summary {
-		actions.Summarize()
-	}
-
-	if *contrib {
-		actions.Contrib()
+	// Execute the appropriate command based on configuration
+	switch config.Command {
+	case "contrib":
+		if config.GUIMode {
+			fmt.Println("Launching GUI mode for contribution graph...")
+			// TODO: Launch GUI mode when implemented
+		} else {
+			actions.ContribWithConfig(config)
+		}
+	case "summary":
+		if config.GUIMode {
+			fmt.Println("Launching GUI mode for summary...")
+			// TODO: Launch GUI mode when implemented
+		} else {
+			actions.Summarize()
+		}
+	case "contributors":
+		if config.GUIMode {
+			fmt.Println("Launching GUI mode for contributors...")
+			// TODO: Launch GUI mode when implemented
+		} else {
+			fmt.Println("Contributors analysis not yet implemented")
+			// TODO: Implement contributors action
+		}
+	case "health":
+		if config.GUIMode {
+			fmt.Println("Launching GUI mode for health analysis...")
+			// TODO: Launch GUI mode when implemented
+		} else {
+			fmt.Println("Health analysis not yet implemented")
+			// TODO: Implement health action
+		}
+	default:
+		fmt.Printf("Unknown command: %s\n", config.Command)
+		os.Exit(1)
 	}
 }

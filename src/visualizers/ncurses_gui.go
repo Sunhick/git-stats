@@ -238,33 +238,60 @@ func (cgw *ContributionGraphWidget) drawContributionCells(screen tcell.Screen, x
 	}
 }
 
-// getCellStyle returns the appropriate style for a cell based on commit count
+// getCellStyle returns the appropriate style for a cell based on commit count with enhanced colors
 func (cgw *ContributionGraphWidget) getCellStyle(commits int) tcell.Style {
 	base := tcell.StyleDefault
 
+	// Calculate activity level based on max commits for better scaling
+	maxCommits := 1
+	if cgw.Data != nil {
+		maxCommits = cgw.Data.MaxCommits
+		if maxCommits == 0 {
+			maxCommits = 1
+		}
+	}
+
 	switch {
 	case commits == 0:
-		return base.Foreground(tcell.ColorGray)
-	case commits <= 3:
-		return base.Foreground(tcell.ColorGreen)
-	case commits <= 9:
-		return base.Foreground(tcell.ColorLime)
+		// No activity - dark gray
+		return base.Foreground(tcell.ColorDarkGray).Background(tcell.ColorBlack)
+	case commits <= maxCommits/4:
+		// Low activity - light green
+		return base.Foreground(tcell.ColorLightGreen).Background(tcell.ColorDarkGreen)
+	case commits <= maxCommits/2:
+		// Medium activity - medium green
+		return base.Foreground(tcell.ColorGreen).Background(tcell.ColorDarkGreen)
+	case commits <= maxCommits*3/4:
+		// High activity - bright green
+		return base.Foreground(tcell.ColorLime).Background(tcell.ColorGreen)
 	default:
-		return base.Foreground(tcell.ColorYellow)
+		// Very high activity - yellow-green
+		return base.Foreground(tcell.ColorYellow).Background(tcell.ColorGreen)
 	}
 }
 
-// getCellChar returns the appropriate character for a cell based on commit count
+// getCellChar returns the appropriate character for a cell based on commit count with better scaling
 func (cgw *ContributionGraphWidget) getCellChar(commits int) rune {
+	// Calculate activity level based on max commits for better scaling
+	maxCommits := 1
+	if cgw.Data != nil {
+		maxCommits = cgw.Data.MaxCommits
+		if maxCommits == 0 {
+			maxCommits = 1
+		}
+	}
+
 	switch {
 	case commits == 0:
-		return '░'
-	case commits <= 3:
-		return '▒'
-	case commits <= 9:
-		return '▓'
+		return '░' // Light shade for no commits
+	case commits <= maxCommits/4:
+		return '▒' // Medium shade for low activity
+	case commits <= maxCommits/2:
+		return '▓' // Dark shade for medium activity
+	case commits <= maxCommits*3/4:
+		return '█' // Full block for high activity
 	default:
-		return '█'
+		return '█' // Full block for very high activity (different color)
 	}
 }
 
@@ -297,27 +324,35 @@ func (cgw *ContributionGraphWidget) HandleInput(event *tcell.EventKey) *tcell.Ev
 	return event
 }
 
-// DetailPanelWidget displays detailed information
+// DetailPanelWidget displays detailed information with enhanced functionality
 type DetailPanelWidget struct {
 	*tview.TextView
-	State     *GUIState
-	Title     string
-	MaxLines  int
-	ScrollPos int
+	State       *GUIState
+	Title       string
+	MaxLines    int
+	ScrollPos   int
+	Content     []string
+	ShowDetails bool
+	SelectedCommitIndex int
 }
 
-// NewDetailPanelWidget creates a new detail panel widget
+// NewDetailPanelWidget creates a new detail panel widget with enhanced functionality
 func NewDetailPanelWidget(state *GUIState, title string) *DetailPanelWidget {
 	widget := &DetailPanelWidget{
-		TextView: tview.NewTextView(),
-		State:    state,
-		Title:    title,
-		MaxLines: 20,
+		TextView:            tview.NewTextView(),
+		State:               state,
+		Title:               title,
+		MaxLines:            20,
+		Content:             make([]string, 0),
+		ShowDetails:         true,
+		SelectedCommitIndex: 0,
 	}
 
 	widget.SetBorder(true).SetTitle(title)
 	widget.SetDynamicColors(true)
 	widget.SetScrollable(true)
+	widget.SetWrap(true)
+	widget.SetWordWrap(true)
 
 	return widget
 }
@@ -347,7 +382,7 @@ func (dpw *DetailPanelWidget) UpdateContent() {
 	dpw.SetText(content.String())
 }
 
-// updateContributionDetails updates content for contribution view
+// updateContributionDetails updates content for contribution view with enhanced commit details
 func (dpw *DetailPanelWidget) updateContributionDetails(content *strings.Builder) {
 	selectedDate := dpw.State.SelectedDate.Format("2006-01-02")
 	commits := 0
@@ -362,9 +397,33 @@ func (dpw *DetailPanelWidget) updateContributionDetails(content *strings.Builder
 	if dpw.State.Data.ContribGraph != nil {
 		content.WriteString(fmt.Sprintf("[yellow]Total Contributions:[white] %d\n", dpw.State.Data.ContribGraph.TotalCommits))
 		content.WriteString(fmt.Sprintf("[yellow]Max Daily Commits:[white] %d\n", dpw.State.Data.ContribGraph.MaxCommits))
-		content.WriteString(fmt.Sprintf("[yellow]Period:[white] %s to %s\n",
+		content.WriteString(fmt.Sprintf("[yellow]Period:[white] %s to %s\n\n",
 			dpw.State.Data.ContribGraph.StartDate.Format("2006-01-02"),
 			dpw.State.Data.ContribGraph.EndDate.Format("2006-01-02")))
+	}
+
+	// Show detailed commit information if available
+	if dpw.ShowDetails && len(dpw.State.SelectedCommits) > 0 {
+		content.WriteString("[cyan]Commit Details:[white]\n")
+		for i, commit := range dpw.State.SelectedCommits {
+			if i >= dpw.MaxLines-10 { // Leave space for other info
+				content.WriteString(fmt.Sprintf("... and %d more commits\n", len(dpw.State.SelectedCommits)-i))
+				break
+			}
+
+			// Highlight selected commit
+			prefix := "  "
+			if i == dpw.SelectedCommitIndex {
+				prefix = "[blue]>[white] "
+			}
+
+			content.WriteString(fmt.Sprintf("%s[green]%s[white]\n", prefix, commit.Hash[:8]))
+			content.WriteString(fmt.Sprintf("%s  %s\n", prefix, truncateString(commit.Message, 40)))
+			content.WriteString(fmt.Sprintf("%s  [gray]%s - %s[white]\n",
+				prefix, commit.Author.Name, commit.AuthorDate.Format("15:04")))
+			content.WriteString(fmt.Sprintf("%s  [gray]+%d/-%d files: %d[white]\n\n",
+				prefix, commit.Stats.Insertions, commit.Stats.Deletions, commit.Stats.FilesChanged))
+		}
 	}
 }
 
@@ -420,31 +479,40 @@ func (dpw *DetailPanelWidget) updateHealthDetails(content *strings.Builder) {
 	content.WriteString(fmt.Sprintf("[yellow]Activity Trend:[white] %s\n", health.ActivityTrend))
 }
 
-// StatusBarWidget displays status information and keyboard shortcuts
+// StatusBarWidget displays status information and keyboard shortcuts with enhanced functionality
 type StatusBarWidget struct {
 	*tview.TextView
-	State    *GUIState
-	Commands []KeyCommand
+	State         *GUIState
+	Commands      []KeyCommand
+	ShowShortcuts bool
+	HelpText      string
 }
 
-// NewStatusBarWidget creates a new status bar widget
+// NewStatusBarWidget creates a new status bar widget with enhanced functionality
 func NewStatusBarWidget(state *GUIState) *StatusBarWidget {
 	widget := &StatusBarWidget{
-		TextView: tview.NewTextView(),
-		State:    state,
+		TextView:      tview.NewTextView(),
+		State:         state,
+		ShowShortcuts: true,
+		HelpText:      "Press ? for help",
 	}
 
 	widget.SetDynamicColors(true)
 	widget.SetTextAlign(tview.AlignLeft)
 
-	// Define key commands
+	// Define comprehensive key commands
 	widget.Commands = []KeyCommand{
 		{Key: tcell.KeyRune, Rune: 'c', Description: "[C]ontrib"},
 		{Key: tcell.KeyRune, Rune: 's', Description: "[S]tats"},
 		{Key: tcell.KeyRune, Rune: 't', Description: "[T]eam"},
-		{Key: tcell.KeyRune, Rune: 'h', Description: "[H]ealth"},
-		{Key: tcell.KeyLeft, Description: "←→ Navigate"},
-		{Key: tcell.KeyUp, Description: "↑↓ Select"},
+		{Key: tcell.KeyRune, Rune: 'H', Description: "[H]ealth"},
+		{Key: tcell.KeyLeft, Description: "← Day"},
+		{Key: tcell.KeyRight, Description: "→ Day"},
+		{Key: tcell.KeyUp, Description: "↑ Week"},
+		{Key: tcell.KeyDown, Description: "↓ Week"},
+		{Key: tcell.KeyRune, Rune: 'h', Description: "h/l Month"},
+		{Key: tcell.KeyRune, Rune: 'd', Description: "[D]etails"},
+		{Key: tcell.KeyRune, Rune: 'j', Description: "j/k Scroll"},
 		{Key: tcell.KeyRune, Rune: 'q', Description: "[Q]uit"},
 		{Key: tcell.KeyRune, Rune: '?', Description: "[?] Help"},
 	}
@@ -462,7 +530,7 @@ func (sbw *StatusBarWidget) GetText(stripTags bool) string {
 	return sbw.TextView.GetText(stripTags)
 }
 
-// UpdateStatus updates the status bar content
+// UpdateStatus updates the status bar content with enhanced information
 func (sbw *StatusBarWidget) UpdateStatus() {
 	var content strings.Builder
 
@@ -470,17 +538,85 @@ func (sbw *StatusBarWidget) UpdateStatus() {
 	content.WriteString(fmt.Sprintf("[yellow]%s[white] | ", sbw.State.StatusMessage))
 
 	// Add current view
-	content.WriteString(fmt.Sprintf("View: [cyan]%s[white] | ", sbw.State.CurrentView.String()))
+	content.WriteString(fmt.Sprintf("View: [cyan]%s[white]", sbw.State.CurrentView.String()))
 
-	// Add keyboard shortcuts
-	for i, cmd := range sbw.Commands {
-		if i > 0 {
-			content.WriteString(" ")
+	// Add view-specific information
+	switch sbw.State.CurrentView {
+	case ContributionView:
+		if sbw.State.Data != nil && sbw.State.Data.ContribGraph != nil {
+			selectedDate := sbw.State.SelectedDate.Format("2006-01-02")
+			commits := sbw.State.Data.ContribGraph.DailyCommits[selectedDate]
+			content.WriteString(fmt.Sprintf(" | [green]%s: %d commits[white]", selectedDate, commits))
 		}
-		content.WriteString(fmt.Sprintf("[gray]%s[white]", cmd.Description))
+	case ContributorsView:
+		if sbw.State.Data != nil {
+			content.WriteString(fmt.Sprintf(" | [green]%d contributors[white]", len(sbw.State.Data.Contributors)))
+		}
+	case StatisticsView:
+		if sbw.State.Data != nil && sbw.State.Data.Summary != nil {
+			content.WriteString(fmt.Sprintf(" | [green]%d total commits[white]", sbw.State.Data.Summary.TotalCommits))
+		}
+	case HealthView:
+		if sbw.State.Data != nil && sbw.State.Data.HealthMetrics != nil {
+			content.WriteString(fmt.Sprintf(" | [green]%s trend[white]", sbw.State.Data.HealthMetrics.ActivityTrend))
+		}
+	}
+
+	// Add keyboard shortcuts if enabled
+	if sbw.ShowShortcuts {
+		content.WriteString(" | ")
+		relevantCommands := sbw.getRelevantCommands()
+		for i, cmd := range relevantCommands {
+			if i > 0 {
+				content.WriteString(" ")
+			}
+			content.WriteString(fmt.Sprintf("[gray]%s[white]", cmd.Description))
+		}
+	} else {
+		content.WriteString(fmt.Sprintf(" | [gray]%s[white]", sbw.HelpText))
 	}
 
 	sbw.SetText(content.String())
+}
+
+// getRelevantCommands returns commands relevant to the current view
+func (sbw *StatusBarWidget) getRelevantCommands() []KeyCommand {
+	baseCommands := []KeyCommand{
+		{Key: tcell.KeyRune, Rune: 'c', Description: "[C]ontrib"},
+		{Key: tcell.KeyRune, Rune: 's', Description: "[S]tats"},
+		{Key: tcell.KeyRune, Rune: 't', Description: "[T]eam"},
+		{Key: tcell.KeyRune, Rune: 'H', Description: "[H]ealth"},
+	}
+
+	switch sbw.State.CurrentView {
+	case ContributionView:
+		return append(baseCommands, []KeyCommand{
+			{Key: tcell.KeyLeft, Description: "←→ Days"},
+			{Key: tcell.KeyUp, Description: "↑↓ Weeks"},
+			{Key: tcell.KeyRune, Rune: 'h', Description: "h/l Months"},
+			{Key: tcell.KeyRune, Rune: 'd', Description: "[D]etails"},
+		}...)
+	case StatisticsView, ContributorsView, HealthView:
+		return append(baseCommands, []KeyCommand{
+			{Key: tcell.KeyRune, Rune: 'j', Description: "j/k Scroll"},
+		}...)
+	}
+
+	return append(baseCommands, []KeyCommand{
+		{Key: tcell.KeyRune, Rune: 'q', Description: "[Q]uit"},
+		{Key: tcell.KeyRune, Rune: '?', Description: "[?] Help"},
+	}...)
+}
+
+// ToggleShortcuts toggles the display of keyboard shortcuts
+func (sbw *StatusBarWidget) ToggleShortcuts() {
+	sbw.ShowShortcuts = !sbw.ShowShortcuts
+	sbw.UpdateStatus()
+}
+
+// GetRelevantCommands returns commands relevant to the current view (public for testing)
+func (sbw *StatusBarWidget) GetRelevantCommands() []KeyCommand {
+	return sbw.getRelevantCommands()
 }
 
 // GUIInterface implements the main GUI interface
@@ -556,10 +692,13 @@ func (gui *GUIInterface) Run(data *models.AnalysisResult) error {
 	return gui.app.Run()
 }
 
-// handleGlobalInput handles global keyboard input
+// handleGlobalInput handles global keyboard input with enhanced navigation
 func (gui *GUIInterface) handleGlobalInput(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyEscape:
+		gui.app.Stop()
+		return nil
+	case tcell.KeyCtrlC:
 		gui.app.Stop()
 		return nil
 	}
@@ -588,22 +727,109 @@ func (gui *GUIInterface) handleGlobalInput(event *tcell.EventKey) *tcell.EventKe
 		gui.state.SwitchView(ContributorsView)
 		gui.updateDisplay()
 		return nil
-	case 'h', 'H':
-		if event.Modifiers()&tcell.ModShift != 0 {
-			// Shift+H for Health view
-			gui.state.SwitchView(HealthView)
+	case 'H':
+		gui.state.SwitchView(HealthView)
+		gui.updateDisplay()
+		return nil
+	case 'd', 'D':
+		// Toggle detail panel visibility
+		if gui.detailPanel != nil {
+			gui.detailPanel.ShowDetails = !gui.detailPanel.ShowDetails
 			gui.updateDisplay()
-			return nil
 		}
-		// Regular 'h' is handled by contribution graph for month navigation
+		return nil
+	case 'j':
+		// Scroll down in detail panel
+		if gui.detailPanel != nil {
+			gui.scrollDetailPanel(1)
+		}
+		return nil
+	case 'k':
+		// Scroll up in detail panel
+		if gui.detailPanel != nil {
+			gui.scrollDetailPanel(-1)
+		}
+		return nil
+	case 'r', 'R':
+		// Refresh display
+		gui.updateDisplay()
+		gui.state.StatusMessage = "Display refreshed"
+		return nil
 	}
 
-	// Let the contribution graph handle navigation
-	if gui.contributionGraph != nil {
-		return gui.contributionGraph.HandleInput(event)
+	// Handle view-specific input
+	switch gui.state.CurrentView {
+	case ContributionView:
+		if gui.contributionGraph != nil {
+			return gui.contributionGraph.HandleInput(event)
+		}
+	case StatisticsView, ContributorsView, HealthView:
+		// Handle scrolling for text-based views
+		return gui.handleTextViewInput(event)
 	}
 
 	return event
+}
+
+// handleTextViewInput handles input for text-based views
+func (gui *GUIInterface) handleTextViewInput(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Key() {
+	case tcell.KeyUp:
+		if gui.detailPanel != nil {
+			gui.scrollDetailPanel(-1)
+		}
+		return nil
+	case tcell.KeyDown:
+		if gui.detailPanel != nil {
+			gui.scrollDetailPanel(1)
+		}
+		return nil
+	case tcell.KeyPageUp:
+		if gui.detailPanel != nil {
+			gui.scrollDetailPanel(-5)
+		}
+		return nil
+	case tcell.KeyPageDown:
+		if gui.detailPanel != nil {
+			gui.scrollDetailPanel(5)
+		}
+		return nil
+	case tcell.KeyHome:
+		if gui.detailPanel != nil {
+			gui.detailPanel.ScrollPos = 0
+			gui.updateDisplay()
+		}
+		return nil
+	case tcell.KeyEnd:
+		if gui.detailPanel != nil {
+			gui.detailPanel.ScrollPos = len(gui.detailPanel.Content)
+			gui.updateDisplay()
+		}
+		return nil
+	}
+	return event
+}
+
+// scrollDetailPanel scrolls the detail panel by the specified amount
+func (gui *GUIInterface) scrollDetailPanel(delta int) {
+	if gui.detailPanel == nil {
+		return
+	}
+
+	newPos := gui.detailPanel.ScrollPos + delta
+	maxPos := len(gui.detailPanel.Content) - gui.detailPanel.MaxLines
+	if maxPos < 0 {
+		maxPos = 0
+	}
+
+	if newPos < 0 {
+		newPos = 0
+	} else if newPos > maxPos {
+		newPos = maxPos
+	}
+
+	gui.detailPanel.ScrollPos = newPos
+	gui.updateDisplay()
 }
 
 // updateDisplay updates all display components
@@ -637,4 +863,75 @@ func (gui *GUIInterface) Cleanup() error {
 		gui.app.Stop()
 	}
 	return nil
+}
+
+// truncateString truncates a string to the specified length with ellipsis
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
+}
+
+// HandleInput processes keyboard input for the detail panel
+func (dpw *DetailPanelWidget) HandleInput(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Key() {
+	case tcell.KeyUp:
+		if dpw.SelectedCommitIndex > 0 {
+			dpw.SelectedCommitIndex--
+			dpw.UpdateContent()
+		}
+		return nil
+	case tcell.KeyDown:
+		if dpw.SelectedCommitIndex < len(dpw.State.SelectedCommits)-1 {
+			dpw.SelectedCommitIndex++
+			dpw.UpdateContent()
+		}
+		return nil
+	case tcell.KeyPageUp:
+		dpw.SelectedCommitIndex = 0
+		dpw.UpdateContent()
+		return nil
+	case tcell.KeyPageDown:
+		if len(dpw.State.SelectedCommits) > 0 {
+			dpw.SelectedCommitIndex = len(dpw.State.SelectedCommits) - 1
+			dpw.UpdateContent()
+		}
+		return nil
+	}
+
+	switch event.Rune() {
+	case 'd', 'D':
+		dpw.ShowDetails = !dpw.ShowDetails
+		dpw.UpdateContent()
+		return nil
+	case 'j':
+		if dpw.SelectedCommitIndex < len(dpw.State.SelectedCommits)-1 {
+			dpw.SelectedCommitIndex++
+			dpw.UpdateContent()
+		}
+		return nil
+	case 'k':
+		if dpw.SelectedCommitIndex > 0 {
+			dpw.SelectedCommitIndex--
+			dpw.UpdateContent()
+		}
+		return nil
+	}
+
+	return event
+}
+
+// HandleInput processes keyboard input for the status bar
+func (sbw *StatusBarWidget) HandleInput(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Rune() {
+	case 'h':
+		// Toggle shortcuts display
+		sbw.ToggleShortcuts()
+		return nil
+	}
+	return event
 }
