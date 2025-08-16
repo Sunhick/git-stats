@@ -8,10 +8,11 @@ Enhanced terminal git statistics utility with comprehensive analysis and visuali
 - **Statistical Analysis**: Comprehensive commit frequency, file statistics, and temporal pattern analysis
 - **Health Metrics**: Repository health scoring with activity trends and growth analysis
 - **Multiple Output Formats**: Terminal, JSON, CSV, and interactive visualizations
-- **Advanced Filtering**: Time range, author, and merge commit filtering
+- **Advanced Filtering**: Comprehensive filtering system with date ranges, author matching, file patterns, and configurable options
 - **Interactive GUI**: Full-screen ncurses interface with keyboard navigation
 - **Comprehensive CLI**: Robust command-line interface with intelligent error handling
 - **Flexible Date Parsing**: Support for absolute and relative date formats
+- **Configuration Management**: Persistent configuration with user and workspace-level settings
 - **Performance Optimized**: Efficient algorithms for large repositories with progress indicators
 
 ## Architecture
@@ -28,6 +29,8 @@ The application is built with a modular architecture:
   - Parser: Robust argument parsing with comprehensive flag support
   - Validator: Input validation for dates, authors, formats, and repository paths
   - Error Handling: Contextual error messages with helpful suggestions
+- **Filtering System**: Advanced filtering with multiple filter types, chaining, and configuration
+- **Configuration System**: JSON-based configuration management with validation and defaults
 - **Visualization**: Terminal-based charts and interactive ncurses GUI
 - **Formatters**: Multiple output format support (terminal, JSON, CSV)
 
@@ -190,6 +193,9 @@ $ make test
 # Run specific test suites
 $ make test-cli          # Test CLI parser and validator
 $ make test-analyzers    # Test analysis engines
+$ make test-filters      # Test filtering system
+$ make test-config       # Test configuration management
+$ make test-integration  # Test system integration
 $ make test-models       # Test data models
 $ make test-git          # Test git operations
 
@@ -206,6 +212,12 @@ $ make dev
 $ make run-contrib       # Test contribution graph
 $ make run-summary       # Test repository summary
 $ make run-health        # Test health analysis
+
+# Test filtering capabilities
+$ make run-filter-date   # Test date filtering
+$ make run-filter-author # Test author filtering
+$ make run-filter-combined # Test combined filters
+$ make run-config-demo   # Test configuration system
 ```
 
 ## Usage
@@ -231,19 +243,70 @@ $ git-stats -health
 $ git-stats -gui
 ```
 
-### Date and Author Filtering
+### Advanced Filtering System
+
+The tool includes a comprehensive filtering system with multiple filter types and configuration options.
+
+#### Date Range Filtering
 
 ```shell
-# Filter by date range
+# Absolute dates
 $ git-stats -contrib -since "2024-01-01" -until "2024-12-31"
+$ git-stats -summary -since "2024-01-15 14:30:00"
 
-# Use relative dates
+# Relative dates
 $ git-stats -summary -since "1 month ago"
 $ git-stats -health -since "yesterday" -until "today"
+$ git-stats -contrib -since "3 weeks ago"
+$ git-stats -summary -since "this week"
+$ git-stats -health -since "this month"
+```
 
-# Filter by author
+#### Advanced Author Filtering
+
+```shell
+# Basic author filtering
 $ git-stats -contributors -author "john"
 $ git-stats -contrib -author "john@example.com"
+
+# Advanced author matching (configured via config file)
+# - Exact matching: "John Doe" matches only "John Doe"
+# - Contains matching: "john" matches "John Doe" and "john@example.com"
+# - Email-only matching: "example.com" matches only email addresses
+# - Name-only matching: "John" matches only names, not emails
+# - Regex matching: "^John.*" for pattern-based matching
+# - Case-sensitive/insensitive options
+```
+
+#### Configuration Management
+
+```shell
+# Configuration is automatically managed via JSON files
+# User-level config: ~/.config/git-stats/config.json (or ~/.git-stats/config.json)
+# Workspace-level config: .git-stats/config.json
+
+# View current configuration
+$ git-stats --show-config
+
+# Reset to defaults
+$ git-stats --reset-config
+
+# Export configuration
+$ git-stats --export-config my-config.json
+
+# Import configuration
+$ git-stats --import-config my-config.json
+```
+
+#### Filter Combinations
+
+```shell
+# Combine multiple filters
+$ git-stats -summary -since "1 year ago" -author "john" -format json
+
+# Complex filtering with configuration
+# Set default filters in config file for consistent behavior
+# CLI options override configuration defaults
 ```
 
 ### Output Formats
@@ -287,11 +350,11 @@ $ git-stats -summary -since "1 year ago" -author "john" -format json -progress
 | `-gui`          | Launch interactive ncurses GUI      |
 
 ### Filtering Options
-| Flag             | Description                    |
-| ---------------- | ------------------------------ |
-| `-since <date>`  | Show commits since date        |
-| `-until <date>`  | Show commits until date        |
-| `-author <name>` | Filter by author name or email |
+| Flag             | Description                                                |
+| ---------------- | ---------------------------------------------------------- |
+| `-since <date>`  | Show commits since date (absolute or relative)             |
+| `-until <date>`  | Show commits until date (absolute or relative)             |
+| `-author <name>` | Filter by author name or email (supports partial matching) |
 
 ### Output Options
 | Flag             | Description                         |
@@ -305,10 +368,92 @@ $ git-stats -summary -since "1 year ago" -author "john" -format json -progress
 | ------------ | ---------------------------------- |
 | `-limit <n>` | Limit number of commits to process |
 
+### Configuration Options
+| Flag                     | Description                     |
+| ------------------------ | ------------------------------- |
+| `--show-config`          | Display current configuration   |
+| `--reset-config`         | Reset configuration to defaults |
+| `--export-config <file>` | Export configuration to file    |
+| `--import-config <file>` | Import configuration from file  |
+
 ### Other Options
 | Flag        | Description           |
 | ----------- | --------------------- |
 | `-help, -h` | Show help information |
+
+## Configuration System
+
+The tool uses a hierarchical JSON-based configuration system with automatic defaults merging.
+
+### Configuration Locations
+
+1. **User-level config**: `~/.config/git-stats/config.json` (or `~/.git-stats/config.json`)
+2. **Workspace-level config**: `.git-stats/config.json` (workspace-specific settings)
+
+Workspace-level settings override user-level settings, and CLI options override both.
+
+### Configuration Structure
+
+```json
+{
+  "defaults": {
+    "command": "contrib",
+    "date_range": "1 year ago",
+    "format": "terminal",
+    "show_progress": false,
+    "repo_path": "."
+  },
+  "filters": {
+    "include_merges": true,
+    "default_author": "",
+    "exclude_patterns": ["*.log", "*.tmp"],
+    "include_patterns": [],
+    "case_sensitive": false,
+    "author_match_type": "contains"
+  },
+  "output": {
+    "color_enabled": true,
+    "color_theme": "github",
+    "pretty_print": true,
+    "include_metadata": true,
+    "date_format": "2006-01-02",
+    "time_format": "15:04:05"
+  },
+  "performance": {
+    "max_commits": 10000,
+    "chunk_size": 1000,
+    "cache_enabled": false,
+    "parallel_processing": true,
+    "max_workers": 4
+  },
+  "gui": {
+    "default_view": "contrib",
+    "refresh_interval": 0,
+    "show_help": false,
+    "contrib_graph_width": 53
+  }
+}
+```
+
+### Filter Configuration Options
+
+#### Author Match Types
+- `"exact"`: Exact string matching
+- `"contains"`: Substring matching (default)
+- `"regex"`: Regular expression matching
+- `"email"`: Email-only matching
+- `"name"`: Name-only matching
+
+#### File Pattern Filtering
+- `exclude_patterns`: File patterns to exclude from analysis
+- `include_patterns`: File patterns to include in analysis
+- Supports glob patterns: `*.go`, `src/**/*.js`, `test_*`
+
+#### Performance Settings
+- `max_commits`: Maximum commits to process
+- `chunk_size`: Processing chunk size for large repositories
+- `parallel_processing`: Enable parallel processing
+- `max_workers`: Maximum worker goroutines
 
 ## Date Formats
 
@@ -317,22 +462,41 @@ The tool supports both absolute and relative date formats:
 **Absolute Dates:**
 - `2024-01-15`
 - `2024-01-15 14:30:00`
+- `2024-01-15T14:30:00Z`
 - `01/15/2024`
 - `15-01-2024`
+- `January 15, 2024`
+- `Jan 15, 2024`
 
 **Relative Dates:**
 - `today`
 - `yesterday`
-- `1 week ago`
-- `2 months ago`
+- `this week`
+- `this month`
+- `this year`
+- `1 day ago`
+- `2 weeks ago`
+- `3 months ago`
 - `1 year ago`
+- `a week ago`
+- `an hour ago` (not supported - use days/weeks/months/years)
 
-## Author Matching
+## Advanced Author Matching
 
-Author filtering supports:
-- Partial name matching: `"john"`
-- Email matching: `"john@example.com"`
-- Full name matching: `"John Doe"`
+Author filtering supports multiple matching modes:
+
+**Basic Matching:**
+- Partial name matching: `"john"` matches "John Doe"
+- Email matching: `"john@example.com"` matches exact email
+- Domain matching: `"@example.com"` matches all emails from domain
+
+**Advanced Matching (via configuration):**
+- **Exact Match**: `"John Doe"` matches only exactly "John Doe"
+- **Contains Match**: `"john"` matches "John Doe" and "john@example.com"
+- **Email-Only Match**: `"example.com"` matches only email addresses
+- **Name-Only Match**: `"John"` matches only names, ignores emails
+- **Regex Match**: `"^John.*"` for pattern-based matching
+- **Case Sensitivity**: Configurable case-sensitive or insensitive matching
 
 ## Output Examples
 
@@ -401,3 +565,36 @@ Example: git-stats -since "2024-01-01" -until "2024-12-31"
 
 For more help, run: git-stats -help
 ```
+
+## New Features in Latest Version
+
+### Advanced Filtering System
+- **Multiple Filter Types**: Date range, author, file path, merge commit, and limit filters
+- **Filter Chaining**: Combine multiple filters with AND logic
+- **Advanced Author Matching**: Exact, contains, regex, email-only, and name-only matching
+- **File Pattern Filtering**: Include/exclude files using glob patterns
+- **Performance Optimized**: Efficient filter implementations with benchmarking
+
+### Configuration Management
+- **JSON-Based Configuration**: Hierarchical configuration with automatic defaults
+- **User and Workspace Configs**: Support for both user-level and workspace-level settings
+- **Import/Export**: Configuration portability and backup
+- **Validation**: Comprehensive validation with helpful error messages
+- **CLI Integration**: Seamless integration between CLI options and configuration
+
+### Enhanced Date Parsing
+- **Extended Relative Dates**: Support for "this week", "this month", "this year"
+- **Multiple Absolute Formats**: ISO dates, US dates, European dates, natural language
+- **Timezone Support**: Full timezone and ISO format support
+
+### Developer Experience
+- **Comprehensive Testing**: 100% test coverage for new features
+- **Benchmarking**: Performance testing for all filter operations
+- **Integration Testing**: End-to-end testing of complete workflows
+- **Documentation**: Extensive documentation with examples
+
+### Performance Improvements
+- **Configurable Limits**: Adjustable processing limits for large repositories
+- **Parallel Processing**: Configurable parallel processing with worker pools
+- **Memory Optimization**: Efficient memory usage for large datasets
+- **Caching Support**: Optional caching for repeated operations

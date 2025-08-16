@@ -83,15 +83,30 @@ test-analyzers:
 	${E} "Running analyzer tests..."
 	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./analyzers/
 
+.PHONY: test-filters
+test-filters:
+	${E} "Running filter tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./filters/
+
+.PHONY: test-config
+test-config:
+	${E} "Running configuration tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./config/
+
+.PHONY: test-integration
+test-integration:
+	${E} "Running integration tests..."
+	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./integration/
+
 .PHONY: test-coverage
 test-coverage: test
 	${E} "Generating coverage report..."
 	${Q} cd $(TEST_DIR) && ${GO} tool cover -html=coverage.out -o coverage.html
 	${E} "Coverage report generated: $(TEST_DIR)/coverage.html"
 
-.PHONY: test-integration
-test-integration:
-	${E} "Running integration tests..."
+.PHONY: test-utils-integration
+test-utils-integration:
+	${E} "Running utility integration tests..."
 	${Q} cd $(TEST_DIR) && ${GO} test $(GO_TEST_FLAGS) ./utils/integration_test.go ./utils/date_test.go ./utils/errors_test.go ./utils/progress_test.go
 
 # GUI test targets
@@ -135,12 +150,17 @@ test-health:
 .PHONY: bench
 bench:
 	${E} "Running benchmarks..."
-	${Q} cd $(TEST_DIR) && ${GO} test -bench=. -benchmem ./analyzers/
+	${Q} cd $(TEST_DIR) && ${GO} test -bench=. -benchmem ./analyzers/ ./filters/
 
 .PHONY: bench-analyzers
 bench-analyzers:
 	${E} "Running analyzer benchmarks..."
 	${Q} cd $(TEST_DIR) && ${GO} test -bench=Benchmark -benchmem ./analyzers/
+
+.PHONY: bench-filters
+bench-filters:
+	${E} "Running filter benchmarks..."
+	${Q} cd $(TEST_DIR) && ${GO} test -bench=Benchmark -benchmem ./filters/
 
 # Development targets
 .PHONY: run
@@ -172,6 +192,27 @@ run-detailed: ${TARGET}
 run-files: ${TARGET}
 	${E} "Running $(TARGET) with file statistics..."
 	${Q} ./${TARGET} -files
+
+# Advanced filtering examples
+.PHONY: run-filter-date
+run-filter-date: ${TARGET}
+	${E} "Running $(TARGET) with date filtering..."
+	${Q} ./${TARGET} -contrib -since "1 month ago"
+
+.PHONY: run-filter-author
+run-filter-author: ${TARGET}
+	${E} "Running $(TARGET) with author filtering..."
+	${Q} ./${TARGET} -contributors -author "$(shell git config user.name)"
+
+.PHONY: run-filter-combined
+run-filter-combined: ${TARGET}
+	${E} "Running $(TARGET) with combined filters..."
+	${Q} ./${TARGET} -summary -since "3 months ago" -author "$(shell git config user.name)" -format json
+
+.PHONY: run-config-demo
+run-config-demo: ${TARGET}
+	${E} "Running $(TARGET) configuration demo..."
+	${Q} ./${TARGET} --show-config || ./${TARGET} -help
 
 .PHONY: dev
 dev:
@@ -344,11 +385,14 @@ help:
 	${E} "  test-git       - Run git tests"
 	${E} "  test-cli       - Run CLI tests"
 	${E} "  test-analyzers - Run analyzer tests"
+	${E} "  test-filters   - Run filter tests"
+	${E} "  test-config    - Run configuration tests"
+	${E} "  test-integration - Run integration tests"
 	${E} "  test-contribution - Run contribution analyzer tests"
 	${E} "  test-statistics - Run statistics analyzer tests"
 	${E} "  test-health    - Run health analyzer tests"
 	${E} "  test-coverage  - Run tests with coverage report"
-	${E} "  test-integration - Run integration tests"
+	${E} "  test-utils-integration - Run utility integration tests"
 	${E} "  test-gui       - Run GUI tests (requires GUI build tags)"
 	${E} "  test-gui-unit  - Run GUI unit tests"
 	${E} "  test-gui-integration - Run GUI integration tests"
@@ -361,6 +405,10 @@ help:
 	${E} "  run-health     - Run with health analysis flag"
 	${E} "  run-detailed   - Run with detailed statistics flag"
 	${E} "  run-files      - Run with file statistics flag"
+	${E} "  run-filter-date - Run with date filtering example"
+	${E} "  run-filter-author - Run with author filtering example"
+	${E} "  run-filter-combined - Run with combined filters example"
+	${E} "  run-config-demo - Run configuration demo"
 	${E} "  dev            - Run in development mode"
 	${E} ""
 	${E} "GUI Targets:"
@@ -376,6 +424,7 @@ help:
 	${E} "Benchmark Targets:"
 	${E} "  bench          - Run all benchmarks"
 	${E} "  bench-analyzers - Run analyzer benchmarks"
+	${E} "  bench-filters  - Run filter benchmarks"
 	${E} ""
 	${E} "Code Quality Targets:"
 	${E} "  fmt            - Format Go code"
