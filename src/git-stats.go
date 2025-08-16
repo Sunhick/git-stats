@@ -46,37 +46,24 @@ func main() {
 	}
 
 	// Execute the appropriate command based on configuration
+	if config.GUIMode {
+		// Launch GUI mode for any command
+		actions.LaunchGUI(config)
+		return
+	}
+
+	// Execute CLI commands
 	switch config.Command {
 	case "contrib":
-		if config.GUIMode {
-			fmt.Println("Launching GUI mode for contribution graph...")
-			// TODO: Launch GUI mode when implemented
-		} else {
-			actions.ContribWithConfig(config)
-		}
+		actions.ContribWithConfig(config)
 	case "summary":
-		if config.GUIMode {
-			fmt.Println("Launching GUI mode for summary...")
-			// TODO: Launch GUI mode when implemented
-		} else {
-			actions.Summarize()
-		}
+		actions.Summarize()
 	case "contributors":
-		if config.GUIMode {
-			fmt.Println("Launching GUI mode for contributors...")
-			// TODO: Launch GUI mode when implemented
-		} else {
-			fmt.Println("Contributors analysis not yet implemented")
-			// TODO: Implement contributors action
-		}
+		fmt.Println("Contributors analysis not yet implemented")
+		// TODO: Implement contributors action
 	case "health":
-		if config.GUIMode {
-			fmt.Println("Launching GUI mode for health analysis...")
-			// TODO: Launch GUI mode when implemented
-		} else {
-			fmt.Println("Health analysis not yet implemented")
-			// TODO: Implement health action
-		}
+		fmt.Println("Health analysis not yet implemented")
+		// TODO: Implement health action
 	default:
 		fmt.Printf("Unknown command: %s\n", config.Command)
 		os.Exit(1)
