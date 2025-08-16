@@ -158,6 +158,203 @@ func TestGUIStateNavigation(t *testing.T) {
 	}
 }
 
+// TestGUIStateYearNavigation tests year navigation functionality
+func TestGUIStateYearNavigation(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	originalStart := state.ViewStartDate
+	originalEnd := state.ViewEndDate
+
+	// Test year navigation forward
+	state.NavigateYear(1)
+	expectedStart := originalStart.AddDate(1, 0, 0)
+	expectedEnd := originalEnd.AddDate(1, 0, 0)
+
+	if !state.ViewStartDate.Equal(expectedStart) {
+		t.Errorf("Expected start date %v, got %v", expectedStart, state.ViewStartDate)
+	}
+
+	if !state.ViewEndDate.Equal(expectedEnd) {
+		t.Errorf("Expected end date %v, got %v", expectedEnd, state.ViewEndDate)
+	}
+
+	// Test year navigation backward
+	state.NavigateYear(-2)
+	expectedStart = originalStart.AddDate(-1, 0, 0)
+	expectedEnd = originalEnd.AddDate(-1, 0, 0)
+
+	if !state.ViewStartDate.Equal(expectedStart) {
+		t.Errorf("Expected start date %v, got %v", expectedStart, state.ViewStartDate)
+	}
+
+	if !state.ViewEndDate.Equal(expectedEnd) {
+		t.Errorf("Expected end date %v, got %v", expectedEnd, state.ViewEndDate)
+	}
+}
+
+// TestGUIStateCommitSelection tests commit selection functionality
+func TestGUIStateCommitSelection(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Test initial state - no selected commits
+	if len(state.SelectedCommits) != 0 {
+		t.Errorf("Expected no selected commits initially, got %d", len(state.SelectedCommits))
+	}
+
+	// Test updating selected commits
+	testCommits := []models.Commit{
+		{
+			Hash:    "abc12345",
+			Message: "Test commit 1",
+			Author: models.Author{
+				Name:  "Test Author",
+				Email: "test@example.com",
+			},
+			AuthorDate: time.Now(),
+			Stats: models.CommitStats{
+				FilesChanged: 2,
+				Insertions:   10,
+				Deletions:    5,
+			},
+		},
+		{
+			Hash:    "def67890",
+			Message: "Test commit 2",
+			Author: models.Author{
+				Name:  "Another Author",
+				Email: "another@example.com",
+			},
+			AuthorDate: time.Now().Add(-time.Hour),
+			Stats: models.CommitStats{
+				FilesChanged: 1,
+				Insertions:   5,
+				Deletions:    2,
+			},
+		},
+	}
+
+	state.UpdateSelectedCommits(testCommits)
+
+	if len(state.SelectedCommits) != len(testCommits) {
+		t.Errorf("Expected %d selected commits, got %d", len(testCommits), len(state.SelectedCommits))
+	}
+
+	// Verify commits are correctly stored
+	for i, commit := range testCommits {
+		if state.SelectedCommits[i].Hash != commit.Hash {
+			t.Errorf("Expected commit hash %s, got %s", commit.Hash, state.SelectedCommits[i].Hash)
+		}
+		if state.SelectedCommits[i].Message != commit.Message {
+			t.Errorf("Expected commit message %s, got %s", commit.Message, state.SelectedCommits[i].Message)
+		}
+	}
+}
+
+// TestGUIStateGetCommitsForDate tests getting commits for a specific date
+func TestGUIStateGetCommitsForDate(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Test with no selected commits
+	commits := state.GetCommitsForDate(time.Now())
+	if len(commits) != 0 {
+		t.Errorf("Expected no commits initially, got %d", len(commits))
+	}
+
+	// Test after setting selected commits
+	testCommits := []models.Commit{
+		{Hash: "abc123", Message: "Test commit"},
+	}
+	state.UpdateSelectedCommits(testCommits)
+
+	commits = state.GetCommitsForDate(time.Now())
+	if len(commits) != len(testCommits) {
+		t.Errorf("Expected %d commits, got %d", len(testCommits), len(commits))
+	}
+}
+
+// TestViewSwitchingWorkflow tests the complete view switching workflow
+func TestViewSwitchingWorkflow(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	// Test initial state
+	if state.CurrentView != visualizers.ContributionView {
+		t.Errorf("Expected initial view to be ContributionView, got %v", state.CurrentView)
+	}
+
+	// Test switching to each view
+	views := []visualizers.ViewType{
+		visualizers.StatisticsView,
+		visualizers.ContributorsView,
+		visualizers.HealthView,
+		visualizers.ContributionView,
+	}
+
+	for _, view := range views {
+		state.SwitchView(view)
+		if state.CurrentView != view {
+			t.Errorf("Expected current view to be %v, got %v", view, state.CurrentView)
+		}
+
+		// Verify status message is updated
+		expectedMessage := "Switched to " + view.String() + " view"
+		if state.StatusMessage != expectedMessage {
+			t.Errorf("Expected status message '%s', got '%s'", expectedMessage, state.StatusMessage)
+		}
+	}
+}
+
+// TestNavigationWorkflow tests the complete navigation workflow
+func TestNavigationWorkflow(t *testing.T) {
+	testData := createTestAnalysisResult()
+	state := visualizers.NewGUIState(testData)
+
+	initialDate := state.SelectedDate
+	initialStartDate := state.ViewStartDate
+	initialEndDate := state.ViewEndDate
+
+	// Test day navigation
+	state.SelectDate(initialDate.AddDate(0, 0, 1))
+	if state.SelectedDate.Equal(initialDate) {
+		t.Error("Expected selected date to change after SelectDate")
+	}
+
+	// Test month navigation
+	state.NavigateMonth(1)
+	if state.ViewStartDate.Equal(initialStartDate) {
+		t.Error("Expected view start date to change after NavigateMonth")
+	}
+	if state.ViewEndDate.Equal(initialEndDate) {
+		t.Error("Expected view end date to change after NavigateMonth")
+	}
+
+	// Test year navigation
+	initialStartAfterMonth := state.ViewStartDate
+	initialEndAfterMonth := state.ViewEndDate
+
+	state.NavigateYear(1)
+	if state.ViewStartDate.Equal(initialStartAfterMonth) {
+		t.Error("Expected view start date to change after NavigateYear")
+	}
+	if state.ViewEndDate.Equal(initialEndAfterMonth) {
+		t.Error("Expected view end date to change after NavigateYear")
+	}
+
+	// Verify year navigation moved by exactly one year
+	expectedStartDate := initialStartAfterMonth.AddDate(1, 0, 0)
+	expectedEndDate := initialEndAfterMonth.AddDate(1, 0, 0)
+
+	if !state.ViewStartDate.Equal(expectedStartDate) {
+		t.Errorf("Expected start date %v, got %v", expectedStartDate, state.ViewStartDate)
+	}
+	if !state.ViewEndDate.Equal(expectedEndDate) {
+		t.Errorf("Expected end date %v, got %v", expectedEndDate, state.ViewEndDate)
+	}
+}
+
 // Helper function to create test data
 func createTestAnalysisResult() *models.AnalysisResult {
 	now := time.Now()

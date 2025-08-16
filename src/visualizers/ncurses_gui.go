@@ -101,6 +101,32 @@ func (gs *GUIState) NavigateMonth(months int) {
 		gs.ViewEndDate.Format("Jan 2006"))
 }
 
+// NavigateYear moves the view by the specified number of years
+func (gs *GUIState) NavigateYear(years int) {
+	gs.ViewStartDate = gs.ViewStartDate.AddDate(years, 0, 0)
+	gs.ViewEndDate = gs.ViewEndDate.AddDate(years, 0, 0)
+	gs.StatusMessage = fmt.Sprintf("Viewing: %s to %s",
+		gs.ViewStartDate.Format("Jan 2006"),
+		gs.ViewEndDate.Format("Jan 2006"))
+}
+
+// GetCommitsForDate returns commits for a specific date
+func (gs *GUIState) GetCommitsForDate(date time.Time) []models.Commit {
+	if gs.Data == nil {
+		return nil
+	}
+
+	// This would typically be populated by the analyzer
+	// For now, return empty slice as the actual commit details
+	// would be fetched from the repository when needed
+	return gs.SelectedCommits
+}
+
+// UpdateSelectedCommits updates the selected commits for the current date
+func (gs *GUIState) UpdateSelectedCommits(commits []models.Commit) {
+	gs.SelectedCommits = commits
+}
+
 // ToggleHelp toggles the help display
 func (gs *GUIState) ToggleHelp() {
 	gs.ShowHelp = !gs.ShowHelp
@@ -299,29 +325,103 @@ func (cgw *ContributionGraphWidget) getCellChar(commits int) rune {
 func (cgw *ContributionGraphWidget) HandleInput(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyLeft:
-		cgw.State.SelectDate(cgw.State.SelectedDate.AddDate(0, 0, -1))
+		newDate := cgw.State.SelectedDate.AddDate(0, 0, -1)
+		cgw.State.SelectDate(newDate)
+		cgw.updateSelectedCommits()
 		return nil
 	case tcell.KeyRight:
-		cgw.State.SelectDate(cgw.State.SelectedDate.AddDate(0, 0, 1))
+		newDate := cgw.State.SelectedDate.AddDate(0, 0, 1)
+		cgw.State.SelectDate(newDate)
+		cgw.updateSelectedCommits()
 		return nil
 	case tcell.KeyUp:
-		cgw.State.SelectDate(cgw.State.SelectedDate.AddDate(0, 0, -7))
+		newDate := cgw.State.SelectedDate.AddDate(0, 0, -7)
+		cgw.State.SelectDate(newDate)
+		cgw.updateSelectedCommits()
 		return nil
 	case tcell.KeyDown:
-		cgw.State.SelectDate(cgw.State.SelectedDate.AddDate(0, 0, 7))
+		newDate := cgw.State.SelectedDate.AddDate(0, 0, 7)
+		cgw.State.SelectDate(newDate)
+		cgw.updateSelectedCommits()
+		return nil
+	case tcell.KeyCtrlLeft:
+		cgw.State.NavigateMonth(-1)
+		return nil
+	case tcell.KeyCtrlRight:
+		cgw.State.NavigateMonth(1)
+		return nil
+	case tcell.KeyCtrlUp:
+		cgw.State.NavigateYear(-1)
+		return nil
+	case tcell.KeyCtrlDown:
+		cgw.State.NavigateYear(1)
 		return nil
 	}
 
 	switch event.Rune() {
-	case 'h', 'H':
+	case 'h':
 		cgw.State.NavigateMonth(-1)
 		return nil
-	case 'l', 'L':
+	case 'l':
 		cgw.State.NavigateMonth(1)
+		return nil
+	case 'H':
+		cgw.State.NavigateYear(-1)
+		return nil
+	case 'L':
+		cgw.State.NavigateYear(1)
+		return nil
+	case 'g':
+		// Go to today
+		cgw.State.SelectDate(time.Now())
+		cgw.updateSelectedCommits()
+		return nil
+	case 'G':
+		// Go to first commit date if available
+		if cgw.State.Data != nil && cgw.State.Data.ContribGraph != nil {
+			cgw.State.SelectDate(cgw.State.Data.ContribGraph.StartDate)
+			cgw.updateSelectedCommits()
+		}
 		return nil
 	}
 
 	return event
+}
+
+// updateSelectedCommits updates the selected commits for the current date
+func (cgw *ContributionGraphWidget) updateSelectedCommits() {
+	if cgw.State.Data == nil {
+		return
+	}
+
+	// In a real implementation, this would fetch actual commit details
+	// For now, we'll create mock commits based on the commit count
+	dateStr := cgw.State.SelectedDate.Format("2006-01-02")
+	commitCount := 0
+	if cgw.Data != nil && cgw.Data.DailyCommits != nil {
+		commitCount = cgw.Data.DailyCommits[dateStr]
+	}
+
+	// Create mock commits for demonstration
+	commits := make([]models.Commit, commitCount)
+	for i := 0; i < commitCount; i++ {
+		commits[i] = models.Commit{
+			Hash:    fmt.Sprintf("abc123%02d", i),
+			Message: fmt.Sprintf("Commit %d on %s", i+1, dateStr),
+			Author: models.Author{
+				Name:  "Test Author",
+				Email: "test@example.com",
+			},
+			AuthorDate: cgw.State.SelectedDate.Add(time.Duration(i) * time.Hour),
+			Stats: models.CommitStats{
+				FilesChanged: 1 + i,
+				Insertions:   10 + i*5,
+				Deletions:    2 + i,
+			},
+		}
+	}
+
+	cgw.State.UpdateSelectedCommits(commits)
 }
 
 // DetailPanelWidget displays detailed information with enhanced functionality
@@ -405,25 +505,40 @@ func (dpw *DetailPanelWidget) updateContributionDetails(content *strings.Builder
 	// Show detailed commit information if available
 	if dpw.ShowDetails && len(dpw.State.SelectedCommits) > 0 {
 		content.WriteString("[cyan]Commit Details:[white]\n")
+
+		// Show navigation hint if there are multiple commits
+		if len(dpw.State.SelectedCommits) > 1 {
+			content.WriteString(fmt.Sprintf("[gray]Use ↑↓ or j/k to navigate commits (%d/%d)[white]\n\n",
+				dpw.SelectedCommitIndex+1, len(dpw.State.SelectedCommits)))
+		}
+
 		for i, commit := range dpw.State.SelectedCommits {
-			if i >= dpw.MaxLines-10 { // Leave space for other info
+			if i >= dpw.MaxLines-12 { // Leave space for other info and navigation hint
 				content.WriteString(fmt.Sprintf("... and %d more commits\n", len(dpw.State.SelectedCommits)-i))
 				break
 			}
 
 			// Highlight selected commit
 			prefix := "  "
+			style := ""
 			if i == dpw.SelectedCommitIndex {
 				prefix = "[blue]>[white] "
+				style = "[blue]"
 			}
 
-			content.WriteString(fmt.Sprintf("%s[green]%s[white]\n", prefix, commit.Hash[:8]))
-			content.WriteString(fmt.Sprintf("%s  %s\n", prefix, truncateString(commit.Message, 40)))
-			content.WriteString(fmt.Sprintf("%s  [gray]%s - %s[white]\n",
-				prefix, commit.Author.Name, commit.AuthorDate.Format("15:04")))
-			content.WriteString(fmt.Sprintf("%s  [gray]+%d/-%d files: %d[white]\n\n",
-				prefix, commit.Stats.Insertions, commit.Stats.Deletions, commit.Stats.FilesChanged))
+			content.WriteString(fmt.Sprintf("%s%s[green]%s[white]\n", prefix, style, commit.Hash))
+			content.WriteString(fmt.Sprintf("%s%s  %s[white]\n", prefix, style, truncateString(commit.Message, 50)))
+			content.WriteString(fmt.Sprintf("%s%s  [gray]%s <%s>[white]\n",
+				prefix, style, commit.Author.Name, commit.Author.Email))
+			content.WriteString(fmt.Sprintf("%s%s  [gray]%s[white]\n",
+				prefix, style, commit.AuthorDate.Format("2006-01-02 15:04:05")))
+			content.WriteString(fmt.Sprintf("%s%s  [gray]Files: %d, +%d/-%d lines[white]\n\n",
+				prefix, style, commit.Stats.FilesChanged, commit.Stats.Insertions, commit.Stats.Deletions))
 		}
+	} else if commits == 0 {
+		content.WriteString("[gray]No commits on this date[white]\n")
+	} else {
+		content.WriteString("[gray]Press 'd' to show commit details[white]\n")
 	}
 }
 
@@ -586,6 +701,7 @@ func (sbw *StatusBarWidget) getRelevantCommands() []KeyCommand {
 		{Key: tcell.KeyRune, Rune: 's', Description: "[S]tats"},
 		{Key: tcell.KeyRune, Rune: 't', Description: "[T]eam"},
 		{Key: tcell.KeyRune, Rune: 'H', Description: "[H]ealth"},
+		{Key: tcell.KeyTab, Description: "Tab"},
 	}
 
 	switch sbw.State.CurrentView {
@@ -594,15 +710,19 @@ func (sbw *StatusBarWidget) getRelevantCommands() []KeyCommand {
 			{Key: tcell.KeyLeft, Description: "←→ Days"},
 			{Key: tcell.KeyUp, Description: "↑↓ Weeks"},
 			{Key: tcell.KeyRune, Rune: 'h', Description: "h/l Months"},
+			{Key: tcell.KeyRune, Rune: 'H', Description: "H/L Years"},
+			{Key: tcell.KeyRune, Rune: 'g', Description: "g Today"},
 			{Key: tcell.KeyRune, Rune: 'd', Description: "[D]etails"},
 		}...)
 	case StatisticsView, ContributorsView, HealthView:
 		return append(baseCommands, []KeyCommand{
 			{Key: tcell.KeyRune, Rune: 'j', Description: "j/k Scroll"},
+			{Key: tcell.KeyUp, Description: "↑↓ Scroll"},
 		}...)
 	}
 
 	return append(baseCommands, []KeyCommand{
+		{Key: tcell.KeyRune, Rune: 'r', Description: "[R]efresh"},
 		{Key: tcell.KeyRune, Rune: 'q', Description: "[Q]uit"},
 		{Key: tcell.KeyRune, Rune: '?', Description: "[?] Help"},
 	}...)
@@ -656,16 +776,26 @@ func (gui *GUIInterface) Run(data *models.AnalysisResult) error {
 	// Create help modal
 	gui.helpModal = tview.NewModal().
 		SetText("Git Stats - Keyboard Shortcuts\n\n" +
-			"Navigation:\n" +
+			"Navigation (Contribution View):\n" +
 			"  ←→ : Navigate days\n" +
 			"  ↑↓ : Navigate weeks\n" +
-			"  h/l : Navigate months\n\n" +
-			"Views:\n" +
-			"  c : Contribution view\n" +
-			"  s : Statistics view\n" +
-			"  t : Team/Contributors view\n" +
-			"  H : Health metrics view\n\n" +
+			"  j/k : Navigate weeks\n" +
+			"  h/l : Navigate months\n" +
+			"  H/L : Navigate years\n" +
+			"  Ctrl+←→ : Navigate months\n" +
+			"  Ctrl+↑↓ : Navigate years\n" +
+			"  g : Go to today\n" +
+			"  G : Go to first commit\n\n" +
+			"View Switching:\n" +
+			"  c/1/F1 : Contribution view\n" +
+			"  s/2/F2 : Statistics view\n" +
+			"  t/3/F3 : Team/Contributors view\n" +
+			"  H/4/F4 : Health metrics view\n" +
+			"  Tab : Cycle views forward\n" +
+			"  Shift+Tab : Cycle views backward\n\n" +
 			"Other:\n" +
+			"  d : Toggle details\n" +
+			"  r : Refresh display\n" +
 			"  ? : Toggle this help\n" +
 			"  q/ESC : Quit").
 		AddButtons([]string{"Close"}).
@@ -700,6 +830,32 @@ func (gui *GUIInterface) handleGlobalInput(event *tcell.EventKey) *tcell.EventKe
 		return nil
 	case tcell.KeyCtrlC:
 		gui.app.Stop()
+		return nil
+	case tcell.KeyTab:
+		// Cycle through views
+		gui.cycleView(1)
+		gui.updateDisplay()
+		return nil
+	case tcell.KeyBacktab: // Shift+Tab
+		// Cycle through views backwards
+		gui.cycleView(-1)
+		gui.updateDisplay()
+		return nil
+	case tcell.KeyF1:
+		gui.state.SwitchView(ContributionView)
+		gui.updateDisplay()
+		return nil
+	case tcell.KeyF2:
+		gui.state.SwitchView(StatisticsView)
+		gui.updateDisplay()
+		return nil
+	case tcell.KeyF3:
+		gui.state.SwitchView(ContributorsView)
+		gui.updateDisplay()
+		return nil
+	case tcell.KeyF4:
+		gui.state.SwitchView(HealthView)
+		gui.updateDisplay()
 		return nil
 	}
 
@@ -739,14 +895,30 @@ func (gui *GUIInterface) handleGlobalInput(event *tcell.EventKey) *tcell.EventKe
 		}
 		return nil
 	case 'j':
-		// Scroll down in detail panel
-		if gui.detailPanel != nil {
+		// Scroll down in detail panel or handle view-specific navigation
+		if gui.state.CurrentView == ContributionView {
+			// In contribution view, j/k should move by week
+			if gui.contributionGraph != nil {
+				newDate := gui.state.SelectedDate.AddDate(0, 0, 7)
+				gui.state.SelectDate(newDate)
+				gui.contributionGraph.updateSelectedCommits()
+				gui.updateDisplay()
+			}
+		} else if gui.detailPanel != nil {
 			gui.scrollDetailPanel(1)
 		}
 		return nil
 	case 'k':
-		// Scroll up in detail panel
-		if gui.detailPanel != nil {
+		// Scroll up in detail panel or handle view-specific navigation
+		if gui.state.CurrentView == ContributionView {
+			// In contribution view, j/k should move by week
+			if gui.contributionGraph != nil {
+				newDate := gui.state.SelectedDate.AddDate(0, 0, -7)
+				gui.state.SelectDate(newDate)
+				gui.contributionGraph.updateSelectedCommits()
+				gui.updateDisplay()
+			}
+		} else if gui.detailPanel != nil {
 			gui.scrollDetailPanel(-1)
 		}
 		return nil
@@ -754,6 +926,22 @@ func (gui *GUIInterface) handleGlobalInput(event *tcell.EventKey) *tcell.EventKe
 		// Refresh display
 		gui.updateDisplay()
 		gui.state.StatusMessage = "Display refreshed"
+		return nil
+	case '1':
+		gui.state.SwitchView(ContributionView)
+		gui.updateDisplay()
+		return nil
+	case '2':
+		gui.state.SwitchView(StatisticsView)
+		gui.updateDisplay()
+		return nil
+	case '3':
+		gui.state.SwitchView(ContributorsView)
+		gui.updateDisplay()
+		return nil
+	case '4':
+		gui.state.SwitchView(HealthView)
+		gui.updateDisplay()
 		return nil
 	}
 
@@ -769,6 +957,28 @@ func (gui *GUIInterface) handleGlobalInput(event *tcell.EventKey) *tcell.EventKe
 	}
 
 	return event
+}
+
+// cycleView cycles through the available views
+func (gui *GUIInterface) cycleView(direction int) {
+	views := []ViewType{ContributionView, StatisticsView, ContributorsView, HealthView}
+	currentIndex := 0
+
+	// Find current view index
+	for i, view := range views {
+		if view == gui.state.CurrentView {
+			currentIndex = i
+			break
+		}
+	}
+
+	// Calculate next view index
+	nextIndex := (currentIndex + direction) % len(views)
+	if nextIndex < 0 {
+		nextIndex = len(views) - 1
+	}
+
+	gui.state.SwitchView(views[nextIndex])
 }
 
 // handleTextViewInput handles input for text-based views

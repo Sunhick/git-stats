@@ -7,6 +7,7 @@
 package visualizers
 
 import (
+	"fmt"
 	"git-stats/models"
 	"git-stats/visualizers"
 	"testing"
@@ -36,6 +37,289 @@ func TestGUIInterfaceWithDependencies(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected Cleanup to succeed, got error: %v", err)
 	}
+}
+
+// TestGUIViewSwitchingWorkflow tests the complete view switching workflow
+func TestGUIViewSwitchingWorkflow(t *testing.T) {
+	testData := createTestAnalysisResultForIntegration()
+	state := visualizers.NewGUIState(testData)
+
+	// Test initial state
+	if state.CurrentView != visualizers.ContributionView {
+		t.Errorf("Expected initial view to be ContributionView, got %v", state.CurrentView)
+	}
+
+	// Test switching to each view
+	views := []visualizers.ViewType{
+		visualizers.StatisticsView,
+		visualizers.ContributorsView,
+		visualizers.HealthView,
+		visualizers.ContributionView,
+	}
+
+	for _, view := range views {
+		state.SwitchView(view)
+		if state.CurrentView != view {
+			t.Errorf("Expected current view to be %v, got %v", view, state.CurrentView)
+		}
+
+		// Verify status message is updated
+		expectedMessage := fmt.Sprintf("Switched to %s view", view.String())
+		if state.StatusMessage != expectedMessage {
+			t.Errorf("Expected status message '%s', got '%s'", expectedMessage, state.StatusMessage)
+		}
+	}
+}
+
+// TestGUINavigationWorkflow tests the complete navigation workflow
+func TestGUINavigationWorkflow(t *testing.T) {
+	testData := createTestAnalysisResultForIntegration()
+	state := visualizers.NewGUIState(testData)
+
+	initialDate := state.SelectedDate
+	initialStartDate := state.ViewStartDate
+	initialEndDate := state.ViewEndDate
+
+	// Test day navigation
+	state.SelectDate(initialDate.AddDate(0, 0, 1))
+	if state.SelectedDate.Equal(initialDate) {
+		t.Error("Expected selected date to change after SelectDate")
+	}
+
+	// Test month navigation
+	state.NavigateMonth(1)
+	if state.ViewStartDate.Equal(initialStartDate) {
+		t.Error("Expected view start date to change after NavigateMonth")
+	}
+	if state.ViewEndDate.Equal(initialEndDate) {
+		t.Error("Expected view end date to change after NavigateMonth")
+	}
+
+	// Test year navigation
+	initialStartAfterMonth := state.ViewStartDate
+	initialEndAfterMonth := state.ViewEndDate
+
+	state.NavigateYear(1)
+	if state.ViewStartDate.Equal(initialStartAfterMonth) {
+		t.Error("Expected view start date to change after NavigateYear")
+	}
+	if state.ViewEndDate.Equal(initialEndAfterMonth) {
+		t.Error("Expected view end date to change after NavigateYear")
+	}
+
+	// Verify year navigation moved by exactly one year
+	expectedStartDate := initialStartAfterMonth.AddDate(1, 0, 0)
+	expectedEndDate := initialEndAfterMonth.AddDate(1, 0, 0)
+
+	if !state.ViewStartDate.Equal(expectedStartDate) {
+		t.Errorf("Expected start date %v, got %v", expectedStartDate, state.ViewStartDate)
+	}
+	if !state.ViewEndDate.Equal(expectedEndDate) {
+		t.Errorf("Expected end date %v, got %v", expectedEndDate, state.ViewEndDate)
+	}
+}
+
+// TestGUICommitSelectionWorkflow tests the commit selection and detail display workflow
+func TestGUICommitSelectionWorkflow(t *testing.T) {
+	testData := createTestAnalysisResultForIntegration()
+	state := visualizers.NewGUIState(testData)
+
+	// Test initial state - no selected commits
+	if len(state.SelectedCommits) != 0 {
+		t.Errorf("Expected no selected commits initially, got %d", len(state.SelectedCommits))
+	}
+
+	// Test updating selected commits
+	testCommits := []models.Commit{
+		{
+			Hash:    "abc12345",
+			Message: "Test commit 1",
+			Author: models.Author{
+				Name:  "Test Author",
+				Email: "test@example.com",
+			},
+			AuthorDate: time.Now(),
+			Stats: models.CommitStats{
+				FilesChanged: 2,
+				Insertions:   10,
+				Deletions:    5,
+			},
+		},
+		{
+			Hash:    "def67890",
+			Message: "Test commit 2",
+			Author: models.Author{
+				Name:  "Another Author",
+				Email: "another@example.com",
+			},
+			AuthorDate: time.Now().Add(-time.Hour),
+			Stats: models.CommitStats{
+				FilesChanged: 1,
+				Insertions:   5,
+				Deletions:    2,
+			},
+		},
+	}
+
+	state.UpdateSelectedCommits(testCommits)
+
+	if len(state.SelectedCommits) != len(testCommits) {
+		t.Errorf("Expected %d selected commits, got %d", len(testCommits), len(state.SelectedCommits))
+	}
+
+	// Verify commits are correctly stored
+	for i, commit := range testCommits {
+		if state.SelectedCommits[i].Hash != commit.Hash {
+			t.Errorf("Expected commit hash %s, got %s", commit.Hash, state.SelectedCommits[i].Hash)
+		}
+		if state.SelectedCommits[i].Message != commit.Message {
+			t.Errorf("Expected commit message %s, got %s", commit.Message, state.SelectedCommits[i].Message)
+		}
+	}
+}
+
+// TestGUIDetailPanelContentWorkflow tests the detail panel content updates for different views
+func TestGUIDetailPanelContentWorkflow(t *testing.T) {
+	testData := createTestAnalysisResultForIntegration()
+	state := visualizers.NewGUIState(testData)
+	detailPanel := visualizers.NewDetailPanelWidget(state, "Test Details")
+
+	// Test content for each view
+	views := []visualizers.ViewType{
+		visualizers.ContributionView,
+		visualizers.StatisticsView,
+		visualizers.ContributorsView,
+		visualizers.HealthView,
+	}
+
+	for _, view := range views {
+		state.SwitchView(view)
+		detailPanel.UpdateContent()
+
+		content := detailPanel.GetText(false)
+		if content == "" {
+			t.Errorf("Expected non-empty content for %s view", view.String())
+		}
+
+		// Verify view-specific content
+		switch view {
+		case visualizers.ContributionView:
+			if !contains(content, "Selected Date:") {
+				t.Errorf("Expected contribution view content to contain 'Selected Date:', got: %s", content)
+			}
+		case visualizers.StatisticsView:
+			if !contains(content, "Total Commits:") {
+				t.Errorf("Expected statistics view content to contain 'Total Commits:', got: %s", content)
+			}
+		case visualizers.ContributorsView:
+			if !contains(content, "Total Contributors:") {
+				t.Errorf("Expected contributors view content to contain 'Total Contributors:', got: %s", content)
+			}
+		case visualizers.HealthView:
+			if !contains(content, "Repository Age:") {
+				t.Errorf("Expected health view content to contain 'Repository Age:', got: %s", content)
+			}
+		}
+	}
+}
+
+// TestGUIStatusBarWorkflow tests the status bar updates for different states
+func TestGUIStatusBarWorkflow(t *testing.T) {
+	testData := createTestAnalysisResultForIntegration()
+	state := visualizers.NewGUIState(testData)
+	statusBar := visualizers.NewStatusBarWidget(state)
+
+	// Test status bar for each view
+	views := []visualizers.ViewType{
+		visualizers.ContributionView,
+		visualizers.StatisticsView,
+		visualizers.ContributorsView,
+		visualizers.HealthView,
+	}
+
+	for _, view := range views {
+		state.SwitchView(view)
+		statusBar.UpdateStatus()
+
+		content := statusBar.GetText(false)
+		if content == "" {
+			t.Errorf("Expected non-empty status content for %s view", view.String())
+		}
+
+		// Verify view name is displayed
+		if !contains(content, view.String()) {
+			t.Errorf("Expected status bar to contain view name '%s', got: %s", view.String(), content)
+		}
+	}
+
+	// Test relevant commands for each view
+	for _, view := range views {
+		state.SwitchView(view)
+		commands := statusBar.GetRelevantCommands()
+
+		if len(commands) == 0 {
+			t.Errorf("Expected non-empty commands for %s view", view.String())
+		}
+
+		// Verify base commands are always present
+		hasViewSwitching := false
+		for _, cmd := range commands {
+			if cmd.Rune == 'c' || cmd.Rune == 's' || cmd.Rune == 't' || cmd.Rune == 'H' {
+				hasViewSwitching = true
+				break
+			}
+		}
+		if !hasViewSwitching {
+			t.Errorf("Expected view switching commands for %s view", view.String())
+		}
+	}
+}
+
+// TestGUIContributionGraphNavigationWorkflow tests the contribution graph navigation
+func TestGUIContributionGraphNavigationWorkflow(t *testing.T) {
+	testData := createTestAnalysisResultForIntegration()
+	state := visualizers.NewGUIState(testData)
+	widget := visualizers.NewContributionGraphWidget(testData.ContribGraph, state)
+
+	initialDate := state.SelectedDate
+
+	// Test day navigation (simulated key events)
+	// Note: We can't actually send key events in unit tests, but we can test the navigation logic
+
+	// Test date selection
+	newDate := initialDate.AddDate(0, 0, 1)
+	state.SelectDate(newDate)
+
+	if state.SelectedDate.Equal(initialDate) {
+		t.Error("Expected selected date to change")
+	}
+
+	// Test that the widget has the correct data
+	if widget.Data != testData.ContribGraph {
+		t.Error("Expected widget to have correct contribution graph data")
+	}
+
+	if widget.State != state {
+		t.Error("Expected widget to have correct state reference")
+	}
+}
+
+// Helper function to check if a string contains a substring
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) &&
+			(s[:len(substr)] == substr ||
+			 s[len(s)-len(substr):] == substr ||
+			 containsInMiddle(s, substr))))
+}
+
+func containsInMiddle(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 func TestContributionGraphWidgetWithDependencies(t *testing.T) {

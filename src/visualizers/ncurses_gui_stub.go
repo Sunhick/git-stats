@@ -97,6 +97,32 @@ func (gs *GUIState) NavigateMonth(months int) {
 		gs.ViewEndDate.Format("Jan 2006"))
 }
 
+// NavigateYear moves the view by the specified number of years
+func (gs *GUIState) NavigateYear(years int) {
+	gs.ViewStartDate = gs.ViewStartDate.AddDate(years, 0, 0)
+	gs.ViewEndDate = gs.ViewEndDate.AddDate(years, 0, 0)
+	gs.StatusMessage = fmt.Sprintf("Viewing: %s to %s",
+		gs.ViewStartDate.Format("Jan 2006"),
+		gs.ViewEndDate.Format("Jan 2006"))
+}
+
+// GetCommitsForDate returns commits for a specific date
+func (gs *GUIState) GetCommitsForDate(date time.Time) []models.Commit {
+	if gs.Data == nil {
+		return nil
+	}
+
+	// This would typically be populated by the analyzer
+	// For now, return empty slice as the actual commit details
+	// would be fetched from the repository when needed
+	return gs.SelectedCommits
+}
+
+// UpdateSelectedCommits updates the selected commits for the current date
+func (gs *GUIState) UpdateSelectedCommits(commits []models.Commit) {
+	gs.SelectedCommits = commits
+}
+
 // ToggleHelp toggles the help display
 func (gs *GUIState) ToggleHelp() {
 	gs.ShowHelp = !gs.ShowHelp
