@@ -41,3 +41,12 @@ type GUIVisualizer interface {
 	HandleInput() error
 	Render() error
 }
+
+// TerminalUIVisualizer interface for terminal UI components
+type TerminalUIVisualizer interface {
+	RenderProgressIndicator(total int, current int, message string, style ProgressStyle) string
+	RenderInteractiveTable(headers []string, rows [][]string, config models.RenderConfig) string
+	RenderColoredBarChart(title string, data map[string]int, maxWidth int) string
+	RenderStatusLine(message string, statusType StatusType, width int) string
+	RenderInteractiveMenu(title string, options []MenuOption) string
+}
