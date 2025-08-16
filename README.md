@@ -54,6 +54,9 @@ $ ./git-stats -gui               # Launch interactive GUI
 # Build the application
 $ make build
 
+# Build with GUI support
+$ make build-gui
+
 # Install to /usr/local/bin
 $ make install
 
@@ -64,6 +67,119 @@ $ make run
 $ make run-contrib    # Test contribution graph
 $ make run-summary    # Test repository summary
 ```
+
+## GUI Mode
+
+The application includes a full-featured interactive ncurses GUI with keyboard navigation.
+
+### Building and Running GUI
+
+```shell
+# Install GUI dependencies and build
+$ make build-gui
+
+# Launch GUI mode
+$ make gui
+
+# Or launch with specific views
+$ make run-gui-contrib      # Start with contribution graph
+$ make run-gui-summary      # Start with summary view
+$ make run-gui-contributors # Start with contributors view
+$ make run-gui-health       # Start with health metrics
+
+# Development mode with GUI
+$ make dev-gui
+```
+
+### Offline/Network-Restricted Environments
+
+If you encounter network connectivity issues when building the GUI:
+
+```shell
+# Check if GUI dependencies are available
+$ make check-gui-deps
+
+# Build GUI in offline mode (uses existing dependencies or falls back to stub)
+$ make build-gui-offline
+
+# Launch GUI in offline mode
+$ make gui-offline
+
+# Alternative: Build without GUI dependencies (uses stub implementation)
+$ make build
+$ ./git-stats -gui  # Will show message about GUI mode requiring build tags
+```
+
+**Note**: The offline build will automatically fall back to a stub implementation if GUI dependencies (tcell and tview) are not available. The stub provides the same API but displays a message that GUI mode requires building with `-tags gui`.
+
+### GUI Features
+
+- **Multiple Views**: Switch between contribution graph, statistics, contributors, and health metrics
+- **Interactive Navigation**: Navigate through dates, months, and years with keyboard shortcuts
+- **Detailed Commit Information**: Select dates to view detailed commit information
+- **Real-time Updates**: Dynamic content updates as you navigate
+- **Comprehensive Help**: Built-in help system with keyboard shortcuts
+
+### GUI Keyboard Shortcuts
+
+#### View Switching
+- `c` / `1` / `F1`: Contribution view
+- `s` / `2` / `F2`: Statistics view
+- `t` / `3` / `F3`: Contributors view
+- `H` / `4` / `F4`: Health metrics view
+- `Tab`: Cycle views forward
+- `Shift+Tab`: Cycle views backward
+
+#### Navigation (Contribution View)
+- `←` / `→`: Navigate days
+- `↑` / `↓`: Navigate weeks
+- `j` / `k`: Navigate weeks
+- `h` / `l`: Navigate months
+- `H` / `L`: Navigate years
+- `Ctrl+←` / `Ctrl+→`: Navigate months
+- `Ctrl+↑` / `Ctrl+↓`: Navigate years
+- `g`: Go to today
+- `G`: Go to first commit
+
+#### Other Controls
+- `d`: Toggle detailed commit information
+- `r`: Refresh display
+- `?`: Toggle help
+- `q` / `ESC`: Quit
+
+### GUI Testing
+
+```shell
+# Run GUI-specific tests
+$ make test-gui-unit         # Unit tests for GUI components
+$ make test-gui-integration  # Integration tests for navigation workflows
+$ make test-gui-all          # All GUI tests
+```
+
+### Troubleshooting GUI Build
+
+**Network/Proxy Issues:**
+```shell
+# If you get "dial tcp: lookup proxy.golang.org: i/o timeout"
+$ make build-gui-offline     # Uses offline build with fallback
+
+# Check dependency availability
+$ make check-gui-deps
+
+# Manual dependency installation (if you have network access)
+$ cd src && go get github.com/gdamore/tcell/v2@v2.6.0
+$ cd src && go get github.com/rivo/tview@v0.0.0-20230826224341-9754ab44dc1c
+```
+
+**Corporate/Restricted Networks:**
+- Use `make build-gui-offline` for builds without internet access
+- The offline build automatically falls back to stub implementation
+- GUI tests work with both full and stub implementations
+
+**Dependency Issues:**
+- GUI dependencies are only required when building with `-tags gui`
+- Without GUI dependencies, the application builds with stub implementation
+- All core functionality works without GUI dependencies
 
 ## Development
 

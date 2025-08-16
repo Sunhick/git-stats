@@ -11,25 +11,55 @@ The GUI functionality uses Go build tags to manage dependencies:
 
 ## Building
 
-### Default Build (Stub)
+### Using Makefile (Recommended)
 ```bash
-go build ./visualizers
+# Build with GUI support (installs dependencies automatically)
+make build-gui
+
+# Launch GUI mode
+make gui
+
+# Launch with specific views
+make run-gui-contrib      # Start with contribution graph
+make run-gui-summary      # Start with summary view
+make run-gui-contributors # Start with contributors view
+make run-gui-health       # Start with health metrics
+
+# Development mode
+make dev-gui
 ```
 
-### GUI Build (Full Implementation)
+### Manual Build
 ```bash
+# Default Build (Stub)
+go build ./visualizers
+
+# GUI Build (Full Implementation)
 go build -tags gui ./visualizers
+
+# Install GUI dependencies first
+go get github.com/gdamore/tcell/v2@v2.6.0
+go get github.com/rivo/tview@v0.0.0-20230826224341-9754ab44dc1c
 ```
 
 ## Testing
 
-### Unit Tests (Stub Implementation)
+### Using Makefile (Recommended)
 ```bash
-go test ./visualizers
+# Run all GUI tests
+make test-gui-all
+
+# Run specific test suites
+make test-gui-unit         # Unit tests for GUI components
+make test-gui-integration  # Integration tests for navigation workflows
 ```
 
-### Integration Tests (Full Implementation)
+### Manual Testing
 ```bash
+# Unit Tests (Stub Implementation)
+go test ./visualizers
+
+# Integration Tests (Full Implementation)
 go test -tags gui ./visualizers
 ```
 
