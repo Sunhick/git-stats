@@ -45,27 +45,27 @@ func main() {
 		return
 	}
 
-	// Execute the appropriate command based on configuration
-	if config.GUIMode {
-		// Launch GUI mode for any command
-		actions.LaunchGUI(config)
-		return
-	}
+	// Create command dispatcher and execute command
+	dispatcher := actions.NewCommandDispatcher()
+	if err := dispatcher.ExecuteCommand(config); err != nil {
+		// Print user-friendly error message
+		fmt.Fprintf(os.Stderr, "%s\n", actions.GetUserFriendlyMessage(err))
 
-	// Execute CLI commands
-	switch config.Command {
-	case "contrib":
-		actions.ContribWithConfig(config)
-	case "summary":
-		actions.Summarize()
-	case "contributors":
-		fmt.Println("Contributors analysis not yet implemented")
-		// TODO: Implement contributors action
-	case "health":
-		fmt.Println("Health analysis not yet implemented")
-		// TODO: Implement health action
-	default:
-		fmt.Printf("Unknown command: %s\n", config.Command)
+		// Exit with appropriate code based on error type
+		if errorType, ok := actions.GetErrorType(err); ok {
+			switch errorType {
+			case actions.ErrSystemRequirements:
+				os.Exit(2) // System requirements not met
+			case actions.ErrRepositoryAccess:
+				os.Exit(3) // Repository access issues
+			case actions.ErrInvalidConfiguration:
+				os.Exit(4) // Configuration errors
+			case actions.ErrNotImplemented:
+				os.Exit(5) // Feature not implemented
+			default:
+				os.Exit(1) // General error
+			}
+		}
 		os.Exit(1)
 	}
 }

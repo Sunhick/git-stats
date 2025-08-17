@@ -45,6 +45,14 @@ type RepositoryConfig struct {
 	Parser   Parser
 }
 
+// NewRepository creates a new GitRepository instance with default configuration
+func NewRepository(path string) (Repository, error) {
+	config := RepositoryConfig{
+		Path: path,
+	}
+	return NewGitRepository(config)
+}
+
 // NewGitRepository creates a new GitRepository instance
 func NewGitRepository(config RepositoryConfig) (*GitRepository, error) {
 	if config.Path == "" {

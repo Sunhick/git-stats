@@ -23,37 +23,64 @@ func LaunchGUI(config *cli.Config) {
 		os.Exit(1)
 	}
 
-	// Create analyzers
-	contribAnalyzer := analyzers.NewContributionAnalyzer(repo)
-	statsAnalyzer := analyzers.NewStatisticsAnalyzer(repo)
-	healthAnalyzer := analyzers.NewHealthAnalyzer(repo)
-
 	// Perform analysis
 	fmt.Println("Analyzing repository...")
 
+	// Get commits for analysis
+	startTime := getStartTime(config.Since)
+	endTime := getEndTime(config.Until)
+
+	commits, err := repo.GetCommits(startTime, endTime, config.Author)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to get commits: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Convert git.Commit to models.Commit
+	modelCommits := convertGitCommitsToModelCommits(commits)
+
+	// Get contributors
+	gitContributors, err := repo.GetContributors()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to get contributors: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Convert git.Contributor to models.Contributor
+	modelContributors := convertGitContributorsToModelContributors(gitContributors)
+
+	// Create analysis configuration
+	analysisConfig := models.AnalysisConfig{
+		TimeRange: models.TimeRange{
+			Start: startTime,
+			End:   endTime,
+		},
+		AuthorFilter:  config.Author,
+		IncludeMerges: true,
+		Limit:         config.Limit,
+	}
+
+	// Create analyzers
+	contribAnalyzer := analyzers.NewContributionAnalyzer()
+	statsAnalyzer := analyzers.NewStatisticsAnalyzer()
+	healthAnalyzer := analyzers.NewHealthAnalyzer()
+
 	// Get contribution graph
-	contribGraph, err := contribAnalyzer.GenerateContributionGraph(config.Since, config.Until)
+	contribGraph, err := contribAnalyzer.AnalyzeContributions(modelCommits, analysisConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to generate contribution graph: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Get statistics
-	summary, err := statsAnalyzer.GenerateStatsSummary(config.Since, config.Until, config.Author)
+	summary, err := statsAnalyzer.AnalyzeStatistics(modelCommits, analysisConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to generate statistics: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get contributors
-	contributors, err := statsAnalyzer.GetContributors(config.Since, config.Until, config.Author)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to get contributors: %v\n", err)
-		os.Exit(1)
-	}
-
 	// Get health metrics
-	healthMetrics, err := healthAnalyzer.AnalyzeHealth(config.Since, config.Until)
+	healthMetrics, err := healthAnalyzer.AnalyzeHealth(modelCommits, modelContributors, analysisConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to analyze health: %v\n", err)
 		os.Exit(1)
@@ -68,9 +95,16 @@ func LaunchGUI(config *cli.Config) {
 
 	// Create analysis result
 	analysisResult := &models.AnalysisResult{
-		Repository:    repoInfo,
+		Repository: &models.RepositoryInfo{
+			Path:         repoInfo.Path,
+			Name:         repoInfo.Name,
+			TotalCommits: repoInfo.TotalCommits,
+			FirstCommit:  repoInfo.FirstCommit,
+			LastCommit:   repoInfo.LastCommit,
+			Branches:     repoInfo.Branches,
+		},
 		Summary:       summary,
-		Contributors:  contributors,
+		Contributors:  modelContributors,
 		ContribGraph:  contribGraph,
 		HealthMetrics: healthMetrics,
 		TimeRange: models.TimeRange{

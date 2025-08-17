@@ -71,10 +71,8 @@ func (v *CLIValidator) ValidateConfig(config *Config) error {
 		}
 	}
 
-	// Validate repository path
-	if err := v.ValidateRepositoryPath(config.RepoPath); err != nil {
-		return err
-	}
+	// Skip repository path validation here - let the dispatcher handle it
+	// with proper error classification
 
 	// Validate limit
 	if err := v.ValidateLimit(config.Limit); err != nil {
