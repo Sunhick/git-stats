@@ -160,12 +160,38 @@ func (fb *FilterBuilder) parseDateRange(dateRange string) (*time.Time, error) {
 		startOfWeek := now.AddDate(0, 0, -weekday)
 		startOfWeek = time.Date(startOfWeek.Year(), startOfWeek.Month(), startOfWeek.Day(), 0, 0, 0, 0, startOfWeek.Location())
 		return &startOfWeek, nil
+	case "last week":
+		// Start of last week
+		weekday := int(now.Weekday())
+		startOfLastWeek := now.AddDate(0, 0, -weekday-7)
+		startOfLastWeek = time.Date(startOfLastWeek.Year(), startOfLastWeek.Month(), startOfLastWeek.Day(), 0, 0, 0, 0, startOfLastWeek.Location())
+		return &startOfLastWeek, nil
 	case "this month":
 		startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		return &startOfMonth, nil
+	case "last month":
+		startOfLastMonth := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
+		return &startOfLastMonth, nil
 	case "this year":
 		startOfYear := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
 		return &startOfYear, nil
+	case "last year":
+		startOfLastYear := time.Date(now.Year()-1, 1, 1, 0, 0, 0, 0, now.Location())
+		return &startOfLastYear, nil
+	case "this quarter":
+		quarter := ((int(now.Month()) - 1) / 3) + 1
+		startOfQuarter := time.Date(now.Year(), time.Month((quarter-1)*3+1), 1, 0, 0, 0, 0, now.Location())
+		return &startOfQuarter, nil
+	case "last quarter":
+		quarter := ((int(now.Month()) - 1) / 3) + 1
+		if quarter == 1 {
+			// Last quarter of previous year
+			startOfLastQuarter := time.Date(now.Year()-1, 10, 1, 0, 0, 0, 0, now.Location())
+			return &startOfLastQuarter, nil
+		} else {
+			startOfLastQuarter := time.Date(now.Year(), time.Month((quarter-2)*3+1), 1, 0, 0, 0, 0, now.Location())
+			return &startOfLastQuarter, nil
+		}
 	}
 
 	// Parse relative dates like "1 year ago", "6 months ago"
@@ -313,6 +339,42 @@ func (fb *FilterBuilder) BuildAdvancedFilter(options AdvancedFilterOptions) (*Fi
 	mergeFilter := NewMergeCommitFilter(options.IncludeMerges)
 	chain.Add(mergeFilter)
 
+	// Add branch filters
+	if len(options.Branches) > 0 {
+		branchFilter := NewBranchFilter(
+			options.Branches,
+			options.BranchMatchType,
+			options.CaseSensitive,
+		)
+		chain.Add(branchFilter)
+	}
+
+	// Add message filter
+	if options.MessageFilter != nil {
+		messageFilter, err := NewMessageFilter(
+			options.MessageFilter.Pattern,
+			options.MessageFilter.MatchType,
+			options.MessageFilter.CaseSensitive,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create message filter: %w", err)
+		}
+		chain.Add(messageFilter)
+	}
+
+	// Add size filter
+	if options.SizeFilter != nil {
+		sizeFilter := NewFileSizeFilter(
+			options.SizeFilter.MinInsertions,
+			options.SizeFilter.MaxInsertions,
+			options.SizeFilter.MinDeletions,
+			options.SizeFilter.MaxDeletions,
+			options.SizeFilter.MinFiles,
+			options.SizeFilter.MaxFiles,
+		)
+		chain.Add(sizeFilter)
+	}
+
 	// Add limit filter
 	if options.Limit > 0 {
 		limitFilter := NewLimitFilter(options.Limit)
@@ -333,6 +395,10 @@ type AdvancedFilterOptions struct {
 	CaseSensitive bool
 	IncludeMerges bool
 	Limit         int
+	Branches      []string
+	BranchMatchType BranchMatchType
+	MessageFilter *MessageFilterOptions
+	SizeFilter    *FileSizeFilterOptions
 }
 
 // AuthorFilterOptions contains options for author filtering
@@ -340,6 +406,23 @@ type AuthorFilterOptions struct {
 	Pattern       string
 	MatchType     AuthorMatchType
 	CaseSensitive bool
+}
+
+// MessageFilterOptions contains options for message filtering
+type MessageFilterOptions struct {
+	Pattern       string
+	MatchType     MessageMatchType
+	CaseSensitive bool
+}
+
+// FileSizeFilterOptions contains options for file size filtering
+type FileSizeFilterOptions struct {
+	MinInsertions int
+	MaxInsertions int
+	MinDeletions  int
+	MaxDeletions  int
+	MinFiles      int
+	MaxFiles      int
 }
 
 // GetFilterSummary returns a human-readable summary of active filters

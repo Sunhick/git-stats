@@ -4,6 +4,7 @@
 package filters
 
 import (
+	"fmt"
 	"git-stats/models"
 	"regexp"
 	"strings"
@@ -468,4 +469,312 @@ func (efpf *ExcludeFilePathFilter) Apply(commits []models.Commit) []models.Commi
 // Description returns a description of the filter
 func (efpf *ExcludeFilePathFilter) Description() string {
 	return "Exclude file paths: " + strings.Join(efpf.Patterns, ", ")
+}
+
+// BranchFilter filters commits by branch name
+type BranchFilter struct {
+	Branches      []string
+	MatchType     BranchMatchType
+	CaseSensitive bool
+}
+
+// BranchMatchType defines how branch matching should be performed
+type BranchMatchType int
+
+const (
+	// BranchExactMatch requires exact branch name match
+	BranchExactMatch BranchMatchType = iota
+	// BranchContainsMatch requires the pattern to be contained in branch name
+	BranchContainsMatch
+	// BranchRegexMatch uses regular expression matching
+	BranchRegexMatch
+)
+
+// NewBranchFilter creates a new branch filter
+func NewBranchFilter(branches []string, matchType BranchMatchType, caseSensitive bool) *BranchFilter {
+	return &BranchFilter{
+		Branches:      branches,
+		MatchType:     matchType,
+		CaseSensitive: caseSensitive,
+	}
+}
+
+// Apply applies the branch filter
+func (bf *BranchFilter) Apply(commits []models.Commit) []models.Commit {
+	if len(bf.Branches) == 0 {
+		return commits
+	}
+
+	var filtered []models.Commit
+	for _, commit := range commits {
+		if bf.matchesBranch(commit) {
+			filtered = append(filtered, commit)
+		}
+	}
+
+	return filtered
+}
+
+// matchesBranch checks if a commit matches any of the branch patterns
+func (bf *BranchFilter) matchesBranch(commit models.Commit) bool {
+	// Note: This is a simplified implementation. In a real scenario,
+	// you would need to determine which branch(es) a commit belongs to
+	// by using git commands or maintaining branch information in the commit model
+
+	// For now, we'll assume the commit has a Branch field (this would need to be added to the model)
+	// This is a placeholder implementation
+	return true // Always match for now - would need actual branch detection logic
+}
+
+// Description returns a description of the filter
+func (bf *BranchFilter) Description() string {
+	return "Branch filter: " + strings.Join(bf.Branches, ", ")
+}
+
+// MessageFilter filters commits by commit message content
+type MessageFilter struct {
+	Pattern       string
+	MatchType     MessageMatchType
+	CaseSensitive bool
+	compiled      *regexp.Regexp
+}
+
+// MessageMatchType defines how message matching should be performed
+type MessageMatchType int
+
+const (
+	// MessageContainsMatch requires the pattern to be contained in the message
+	MessageContainsMatch MessageMatchType = iota
+	// MessageRegexMatch uses regular expression matching
+	MessageRegexMatch
+	// MessageStartsWithMatch matches messages that start with the pattern
+	MessageStartsWithMatch
+	// MessageEndsWithMatch matches messages that end with the pattern
+	MessageEndsWithMatch
+)
+
+// NewMessageFilter creates a new message filter
+func NewMessageFilter(pattern string, matchType MessageMatchType, caseSensitive bool) (*MessageFilter, error) {
+	mf := &MessageFilter{
+		Pattern:       pattern,
+		MatchType:     matchType,
+		CaseSensitive: caseSensitive,
+	}
+
+	// Compile regex if needed
+	if matchType == MessageRegexMatch {
+		flags := "i" // case insensitive by default
+		if caseSensitive {
+			flags = ""
+		}
+		regexPattern := "(?" + flags + ")" + pattern
+		compiled, err := regexp.Compile(regexPattern)
+		if err != nil {
+			return nil, err
+		}
+		mf.compiled = compiled
+	}
+
+	return mf, nil
+}
+
+// Apply applies the message filter
+func (mf *MessageFilter) Apply(commits []models.Commit) []models.Commit {
+	if mf.Pattern == "" {
+		return commits
+	}
+
+	var filtered []models.Commit
+	for _, commit := range commits {
+		if mf.matchesMessage(commit.Message) {
+			filtered = append(filtered, commit)
+		}
+	}
+
+	return filtered
+}
+
+// matchesMessage checks if a message matches the filter criteria
+func (mf *MessageFilter) matchesMessage(message string) bool {
+	switch mf.MatchType {
+	case MessageContainsMatch:
+		return mf.containsMatch(message)
+	case MessageRegexMatch:
+		return mf.regexMatch(message)
+	case MessageStartsWithMatch:
+		return mf.startsWithMatch(message)
+	case MessageEndsWithMatch:
+		return mf.endsWithMatch(message)
+	default:
+		return mf.containsMatch(message)
+	}
+}
+
+// containsMatch performs substring matching
+func (mf *MessageFilter) containsMatch(message string) bool {
+	if mf.CaseSensitive {
+		return strings.Contains(message, mf.Pattern)
+	}
+
+	pattern := strings.ToLower(mf.Pattern)
+	msg := strings.ToLower(message)
+	return strings.Contains(msg, pattern)
+}
+
+// regexMatch performs regular expression matching
+func (mf *MessageFilter) regexMatch(message string) bool {
+	if mf.compiled == nil {
+		return false
+	}
+	return mf.compiled.MatchString(message)
+}
+
+// startsWithMatch checks if message starts with pattern
+func (mf *MessageFilter) startsWithMatch(message string) bool {
+	if mf.CaseSensitive {
+		return strings.HasPrefix(message, mf.Pattern)
+	}
+
+	pattern := strings.ToLower(mf.Pattern)
+	msg := strings.ToLower(message)
+	return strings.HasPrefix(msg, pattern)
+}
+
+// endsWithMatch checks if message ends with pattern
+func (mf *MessageFilter) endsWithMatch(message string) bool {
+	if mf.CaseSensitive {
+		return strings.HasSuffix(message, mf.Pattern)
+	}
+
+	pattern := strings.ToLower(mf.Pattern)
+	msg := strings.ToLower(message)
+	return strings.HasSuffix(msg, pattern)
+}
+
+// Description returns a description of the filter
+func (mf *MessageFilter) Description() string {
+	matchTypeStr := ""
+	switch mf.MatchType {
+	case MessageContainsMatch:
+		matchTypeStr = "contains"
+	case MessageRegexMatch:
+		matchTypeStr = "regex"
+	case MessageStartsWithMatch:
+		matchTypeStr = "starts with"
+	case MessageEndsWithMatch:
+		matchTypeStr = "ends with"
+	}
+
+	caseStr := ""
+	if mf.CaseSensitive {
+		caseStr = " (case-sensitive)"
+	}
+
+	return "Message " + matchTypeStr + " match: '" + mf.Pattern + "'" + caseStr
+}
+
+// FileSizeFilter filters commits based on the size of changes
+type FileSizeFilter struct {
+	MinInsertions int
+	MaxInsertions int
+	MinDeletions  int
+	MaxDeletions  int
+	MinFiles      int
+	MaxFiles      int
+}
+
+// NewFileSizeFilter creates a new file size filter
+func NewFileSizeFilter(minInsertions, maxInsertions, minDeletions, maxDeletions, minFiles, maxFiles int) *FileSizeFilter {
+	return &FileSizeFilter{
+		MinInsertions: minInsertions,
+		MaxInsertions: maxInsertions,
+		MinDeletions:  minDeletions,
+		MaxDeletions:  maxDeletions,
+		MinFiles:      minFiles,
+		MaxFiles:      maxFiles,
+	}
+}
+
+// Apply applies the file size filter
+func (fsf *FileSizeFilter) Apply(commits []models.Commit) []models.Commit {
+	var filtered []models.Commit
+	for _, commit := range commits {
+		if fsf.matchesSize(commit) {
+			filtered = append(filtered, commit)
+		}
+	}
+
+	return filtered
+}
+
+// matchesSize checks if a commit matches the size criteria
+func (fsf *FileSizeFilter) matchesSize(commit models.Commit) bool {
+	stats := commit.Stats
+
+	// Check insertions
+	if fsf.MinInsertions > 0 && stats.Insertions < fsf.MinInsertions {
+		return false
+	}
+	if fsf.MaxInsertions > 0 && stats.Insertions > fsf.MaxInsertions {
+		return false
+	}
+
+	// Check deletions
+	if fsf.MinDeletions > 0 && stats.Deletions < fsf.MinDeletions {
+		return false
+	}
+	if fsf.MaxDeletions > 0 && stats.Deletions > fsf.MaxDeletions {
+		return false
+	}
+
+	// Check files changed
+	if fsf.MinFiles > 0 && stats.FilesChanged < fsf.MinFiles {
+		return false
+	}
+	if fsf.MaxFiles > 0 && stats.FilesChanged > fsf.MaxFiles {
+		return false
+	}
+
+	return true
+}
+
+// Description returns a description of the filter
+func (fsf *FileSizeFilter) Description() string {
+	var parts []string
+
+	if fsf.MinInsertions > 0 || fsf.MaxInsertions > 0 {
+		if fsf.MinInsertions > 0 && fsf.MaxInsertions > 0 {
+			parts = append(parts, fmt.Sprintf("insertions: %d-%d", fsf.MinInsertions, fsf.MaxInsertions))
+		} else if fsf.MinInsertions > 0 {
+			parts = append(parts, fmt.Sprintf("insertions: >=%d", fsf.MinInsertions))
+		} else {
+			parts = append(parts, fmt.Sprintf("insertions: <=%d", fsf.MaxInsertions))
+		}
+	}
+
+	if fsf.MinDeletions > 0 || fsf.MaxDeletions > 0 {
+		if fsf.MinDeletions > 0 && fsf.MaxDeletions > 0 {
+			parts = append(parts, fmt.Sprintf("deletions: %d-%d", fsf.MinDeletions, fsf.MaxDeletions))
+		} else if fsf.MinDeletions > 0 {
+			parts = append(parts, fmt.Sprintf("deletions: >=%d", fsf.MinDeletions))
+		} else {
+			parts = append(parts, fmt.Sprintf("deletions: <=%d", fsf.MaxDeletions))
+		}
+	}
+
+	if fsf.MinFiles > 0 || fsf.MaxFiles > 0 {
+		if fsf.MinFiles > 0 && fsf.MaxFiles > 0 {
+			parts = append(parts, fmt.Sprintf("files: %d-%d", fsf.MinFiles, fsf.MaxFiles))
+		} else if fsf.MinFiles > 0 {
+			parts = append(parts, fmt.Sprintf("files: >=%d", fsf.MinFiles))
+		} else {
+			parts = append(parts, fmt.Sprintf("files: <=%d", fsf.MaxFiles))
+		}
+	}
+
+	if len(parts) == 0 {
+		return "No size filter"
+	}
+
+	return "Size filter: " + strings.Join(parts, ", ")
 }

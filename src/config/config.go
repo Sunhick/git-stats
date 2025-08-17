@@ -46,6 +46,16 @@ type FilterConfig struct {
 	IncludePatterns   []string `json:"include_patterns"`    // Default file patterns to include
 	CaseSensitive     bool     `json:"case_sensitive"`      // Case sensitive filtering
 	AuthorMatchType   string   `json:"author_match_type"`   // Default author matching type
+	DefaultBranches   []string `json:"default_branches"`    // Default branches to filter
+	BranchMatchType   string   `json:"branch_match_type"`   // Default branch matching type
+	MessagePatterns   []string `json:"message_patterns"`    // Default message patterns to filter
+	MessageMatchType  string   `json:"message_match_type"`  // Default message matching type
+	MinInsertions     int      `json:"min_insertions"`      // Minimum insertions filter
+	MaxInsertions     int      `json:"max_insertions"`      // Maximum insertions filter
+	MinDeletions      int      `json:"min_deletions"`       // Minimum deletions filter
+	MaxDeletions      int      `json:"max_deletions"`       // Maximum deletions filter
+	MinFiles          int      `json:"min_files"`           // Minimum files changed filter
+	MaxFiles          int      `json:"max_files"`           // Maximum files changed filter
 }
 
 // OutputConfig contains output formatting settings
@@ -109,12 +119,22 @@ func getDefaultConfig() *Config {
 			RepoPath:     ".",
 		},
 		Filters: FilterConfig{
-			IncludeMerges:   true,
-			DefaultAuthor:   "",
-			ExcludePatterns: []string{},
-			IncludePatterns: []string{},
-			CaseSensitive:   false,
-			AuthorMatchType: "contains",
+			IncludeMerges:    true,
+			DefaultAuthor:    "",
+			ExcludePatterns:  []string{},
+			IncludePatterns:  []string{},
+			CaseSensitive:    false,
+			AuthorMatchType:  "contains",
+			DefaultBranches:  []string{},
+			BranchMatchType:  "contains",
+			MessagePatterns:  []string{},
+			MessageMatchType: "contains",
+			MinInsertions:    0,
+			MaxInsertions:    0,
+			MinDeletions:     0,
+			MaxDeletions:     0,
+			MinFiles:         0,
+			MaxFiles:         0,
 		},
 		Output: OutputConfig{
 			ColorEnabled:    true,
@@ -281,11 +301,23 @@ func (cm *ConfigManager) mergeWithDefaults(loaded *Config) *Config {
 	if loaded.Filters.AuthorMatchType == "" {
 		loaded.Filters.AuthorMatchType = defaults.Filters.AuthorMatchType
 	}
+	if loaded.Filters.BranchMatchType == "" {
+		loaded.Filters.BranchMatchType = defaults.Filters.BranchMatchType
+	}
+	if loaded.Filters.MessageMatchType == "" {
+		loaded.Filters.MessageMatchType = defaults.Filters.MessageMatchType
+	}
 	if loaded.Filters.ExcludePatterns == nil {
 		loaded.Filters.ExcludePatterns = defaults.Filters.ExcludePatterns
 	}
 	if loaded.Filters.IncludePatterns == nil {
 		loaded.Filters.IncludePatterns = defaults.Filters.IncludePatterns
+	}
+	if loaded.Filters.DefaultBranches == nil {
+		loaded.Filters.DefaultBranches = defaults.Filters.DefaultBranches
+	}
+	if loaded.Filters.MessagePatterns == nil {
+		loaded.Filters.MessagePatterns = defaults.Filters.MessagePatterns
 	}
 
 	// Merge output settings
@@ -343,9 +375,50 @@ func (cm *ConfigManager) Validate() error {
 	}
 
 	// Validate filter settings
-	validMatchTypes := []string{"exact", "contains", "regex", "email", "name"}
-	if !contains(validMatchTypes, config.Filters.AuthorMatchType) {
+	validAuthorMatchTypes := []string{"exact", "contains", "regex", "email", "name"}
+	if !contains(validAuthorMatchTypes, config.Filters.AuthorMatchType) {
 		return fmt.Errorf("invalid author match type: %s", config.Filters.AuthorMatchType)
+	}
+
+	validBranchMatchTypes := []string{"exact", "contains", "regex"}
+	if !contains(validBranchMatchTypes, config.Filters.BranchMatchType) {
+		return fmt.Errorf("invalid branch match type: %s", config.Filters.BranchMatchType)
+	}
+
+	validMessageMatchTypes := []string{"contains", "regex", "starts_with", "ends_with"}
+	if !contains(validMessageMatchTypes, config.Filters.MessageMatchType) {
+		return fmt.Errorf("invalid message match type: %s", config.Filters.MessageMatchType)
+	}
+
+	// Validate size filters
+	if config.Filters.MinInsertions < 0 {
+		return fmt.Errorf("min insertions cannot be negative: %d", config.Filters.MinInsertions)
+	}
+	if config.Filters.MaxInsertions < 0 {
+		return fmt.Errorf("max insertions cannot be negative: %d", config.Filters.MaxInsertions)
+	}
+	if config.Filters.MinInsertions > 0 && config.Filters.MaxInsertions > 0 && config.Filters.MinInsertions > config.Filters.MaxInsertions {
+		return fmt.Errorf("min insertions cannot be greater than max insertions")
+	}
+
+	if config.Filters.MinDeletions < 0 {
+		return fmt.Errorf("min deletions cannot be negative: %d", config.Filters.MinDeletions)
+	}
+	if config.Filters.MaxDeletions < 0 {
+		return fmt.Errorf("max deletions cannot be negative: %d", config.Filters.MaxDeletions)
+	}
+	if config.Filters.MinDeletions > 0 && config.Filters.MaxDeletions > 0 && config.Filters.MinDeletions > config.Filters.MaxDeletions {
+		return fmt.Errorf("min deletions cannot be greater than max deletions")
+	}
+
+	if config.Filters.MinFiles < 0 {
+		return fmt.Errorf("min files cannot be negative: %d", config.Filters.MinFiles)
+	}
+	if config.Filters.MaxFiles < 0 {
+		return fmt.Errorf("max files cannot be negative: %d", config.Filters.MaxFiles)
+	}
+	if config.Filters.MinFiles > 0 && config.Filters.MaxFiles > 0 && config.Filters.MinFiles > config.Filters.MaxFiles {
+		return fmt.Errorf("min files cannot be greater than max files")
 	}
 
 	// Validate output settings
