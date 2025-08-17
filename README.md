@@ -52,16 +52,17 @@ $ cd git-stats
 $ make build
 
 # Show help
-$ ./git-stats -help
+$ ./git-stats-gui -help
 
 # Basic usage - remember: flags first, then repository path
-$ ./git-stats -contrib                    # Show contribution graph (current directory)
-$ ./git-stats -summary /path/to/repo      # Show repository summary
-$ ./git-stats -contributors /path/to/repo # Show contributor analysis
-$ ./git-stats -health /path/to/repo       # Show repository health metrics
+$ ./git-stats-gui -contrib                    # Show contribution graph (current directory)
+$ ./git-stats-gui -summary /path/to/repo      # Show repository summary
+$ ./git-stats-gui -contributors /path/to/repo # Show contributor analysis
+$ ./git-stats-gui -health /path/to/repo       # Show repository health metrics
+$ ./git-stats-gui -gui /path/to/repo          # Launch interactive GUI mode
 
-# Note: Use format: git-stats [flags] [repository-path]
-# NOT: git-stats [repository-path] [flags]
+# Note: Use format: git-stats-gui [flags] [repository-path]
+# NOT: git-stats-gui [repository-path] [flags]
 ```
 
 ## Build & Install
@@ -72,8 +73,11 @@ $ ./git-stats -health /path/to/repo       # Show repository health metrics
 # Show all available targets with descriptions
 $ make help
 
-# Build the application (terminal mode only)
+# Build the application with GUI support (default)
 $ make build
+
+# Build terminal-only version
+$ make build-terminal
 
 # Check if GUI dependencies are available
 $ make check-gui-deps
@@ -90,8 +94,14 @@ $ GOPROXY=direct make build-gui
 # Build GUI in offline mode (uses stub if dependencies missing)
 $ make build-gui-offline
 
-# Install to /usr/local/bin
+# Install to /usr/local/bin (installs GUI version too if available)
 $ make install
+
+# Install GUI version only
+$ make install-gui
+
+# Install both terminal and GUI versions
+$ make install-all
 
 # Clean build artifacts
 $ make clean
@@ -297,31 +307,31 @@ After building, you can add the folder containing `git-stats` to your PATH varia
 
 ```shell
 # Show contribution graph (default) - current directory
-$ git-stats
+$ git-stats-gui
 
 # Show contribution graph for specific repository
-$ git-stats -contrib /path/to/repository
+$ git-stats-gui -contrib /path/to/repository
 
 # Show detailed repository statistics
-$ git-stats -summary /path/to/repository
+$ git-stats-gui -summary /path/to/repository
 
 # Show contributor statistics
-$ git-stats -contributors /path/to/repository
+$ git-stats-gui -contributors /path/to/repository
 
 # Show repository health metrics
-$ git-stats -health /path/to/repository
+$ git-stats-gui -health /path/to/repository
 
-# Launch interactive GUI (requires GUI build)
-$ git-stats -gui /path/to/repository
+# Launch interactive GUI mode
+$ git-stats-gui -gui /path/to/repository
 ```
 
 **Common Mistake**: Putting the repository path before flags won't work:
 ```shell
 # ❌ Wrong - flags after path are ignored
-$ git-stats /path/to/repo -summary
+$ git-stats-gui /path/to/repo -summary
 
 # ✅ Correct - flags before path
-$ git-stats -summary /path/to/repo
+$ git-stats-gui -summary /path/to/repo
 ```
 
 ### Advanced Filtering System
@@ -383,7 +393,7 @@ $ git-stats --import-config my-config.json
 
 ```shell
 # Combine multiple filters
-$ git-stats -summary -since "1 year ago" -author "john" -format json
+$ git-stats-gui -summary -since "1 year ago" -author "john" -format json
 
 # Complex filtering with configuration
 # Set default filters in config file for consistent behavior
@@ -394,29 +404,29 @@ $ git-stats -summary -since "1 year ago" -author "john" -format json
 
 ```shell
 # Export to JSON
-$ git-stats -summary -format json
+$ git-stats-gui -summary -format json
 
 # Export to CSV
-$ git-stats -contributors -format csv
+$ git-stats-gui -contributors -format csv
 
 # Save to file
-$ git-stats -summary -format json -output report.json
+$ git-stats-gui -summary -format json -output report.json
 ```
 
 ### Advanced Options
 
 ```shell
 # Show progress for large repositories
-$ git-stats -summary -progress
+$ git-stats-gui -summary -progress
 
 # Limit commits processed
-$ git-stats -contrib -limit 5000
+$ git-stats-gui -contrib -limit 5000
 
 # Analyze specific repository
-$ git-stats -summary /path/to/repo
+$ git-stats-gui -summary /path/to/repo
 
 # Combine multiple options
-$ git-stats -summary -since "1 year ago" -author "john" -format json -progress
+$ git-stats-gui -summary -since "1 year ago" -author "john" -format json -progress
 ```
 
 ## Command Line Options
@@ -756,7 +766,8 @@ $ ./git-stats -gui /path/to/repo  # Shows helpful instructions
 
 ### Build Commands
 ```shell
-make build                    # Build terminal version
+make build                    # Build with GUI support (default)
+make build-terminal           # Build terminal-only version
 make build-gui                # Build with GUI (requires network)
 GOPROXY=direct make build-gui # Build with GUI using direct proxy
 make build-gui-offline        # Build GUI offline (stub if deps missing)
@@ -767,21 +778,21 @@ make help                     # Show all make targets
 ### Usage Patterns
 ```shell
 # Terminal analysis
-git-stats -contrib /path/to/repo
-git-stats -summary /path/to/repo
-git-stats -contributors /path/to/repo
-git-stats -health /path/to/repo
+git-stats-gui -contrib /path/to/repo
+git-stats-gui -summary /path/to/repo
+git-stats-gui -contributors /path/to/repo
+git-stats-gui -health /path/to/repo
 
 # Output formats
-git-stats -summary -format json /path/to/repo
-git-stats -contributors -format csv /path/to/repo
+git-stats-gui -summary -format json /path/to/repo
+git-stats-gui -contributors -format csv /path/to/repo
 
 # Date filtering
-git-stats -contrib -since "1 month ago" /path/to/repo
-git-stats -summary -since "2024-01-01" -until "2024-12-31" /path/to/repo
+git-stats-gui -contrib -since "1 month ago" /path/to/repo
+git-stats-gui -summary -since "2024-01-01" -until "2024-12-31" /path/to/repo
 
-# GUI mode (requires GUI build)
-git-stats -gui /path/to/repo
+# GUI mode
+git-stats-gui -gui /path/to/repo
 ```
 
 ### Common Flags
@@ -798,7 +809,8 @@ git-stats -gui /path/to/repo
 - `-help`: Show help
 
 ### Remember
-- **Argument order**: `git-stats [flags] [repository-path]`
-- **GUI requires**: Build with `make build-gui` or `make build-gui-offline`
+- **Argument order**: `git-stats-gui [flags] [repository-path]`
+- **GUI included**: Default build now includes GUI support
+- **Terminal only**: Use `make build-terminal` for terminal-only version
 - **Network issues**: Use `make build-gui-offline` for offline GUI build
 - **Default directory**: Current directory if no path specified

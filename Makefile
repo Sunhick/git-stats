@@ -12,16 +12,19 @@ GO_BUILD_FLAGS = -ldflags="-s -w"
 GO_TEST_FLAGS = -v -race -coverprofile=coverage.out
 
 .PHONY: all
-all: ${TARGET}
+all: build
 
 include common.mk
 
 # Build targets
 .PHONY: build
-build: ${TARGET}
+build: build-gui
+
+.PHONY: build-terminal
+build-terminal: ${TARGET}
 
 .PHONY: rebuild
-rebuild: clean ${TARGET}
+rebuild: clean build
 
 .PHONY: debug
 debug:
@@ -164,64 +167,65 @@ bench-filters:
 
 # Development targets
 .PHONY: run
-run: ${TARGET}
-	@echo "Running $(TARGET)..."
-	@echo "Usage: ./${TARGET} [options] [repository-path]"
+run: build
+	@echo "Running $(TARGET)-gui..."
+	@echo "Usage: ./${TARGET}-gui [options] [repository-path]"
 	@echo "Examples:"
-	@echo "  ./${TARGET} -contrib"
-	@echo "  ./${TARGET} -summary /path/to/repo"
-	@echo "  ./${TARGET} -help"
+	@echo "  ./${TARGET}-gui -contrib"
+	@echo "  ./${TARGET}-gui -summary /path/to/repo"
+	@echo "  ./${TARGET}-gui -gui /path/to/repo"
+	@echo "  ./${TARGET}-gui -help"
 
 .PHONY: run-summary
-run-summary: ${TARGET}
-	${E} "Running $(TARGET) with summary..."
-	${Q} ./${TARGET} -summarize
+run-summary: build
+	${E} "Running $(TARGET)-gui with summary..."
+	${Q} ./${TARGET}-gui -summary
 
 .PHONY: run-contrib
-run-contrib: ${TARGET}
-	${E} "Running $(TARGET) with contribution graph..."
-	${Q} ./${TARGET} -contrib
+run-contrib: build
+	${E} "Running $(TARGET)-gui with contribution graph..."
+	${Q} ./${TARGET}-gui -contrib
 
 .PHONY: run-health
-run-health: ${TARGET}
-	${E} "Running $(TARGET) with health analysis..."
-	${Q} ./${TARGET} -health
+run-health: build
+	${E} "Running $(TARGET)-gui with health analysis..."
+	${Q} ./${TARGET}-gui -health
 
 .PHONY: run-detailed
-run-detailed: ${TARGET}
-	${E} "Running $(TARGET) with detailed statistics..."
-	${Q} ./${TARGET} -detailed
+run-detailed: build
+	${E} "Running $(TARGET)-gui with detailed statistics..."
+	${Q} ./${TARGET}-gui -detailed
 
 .PHONY: run-files
-run-files: ${TARGET}
-	${E} "Running $(TARGET) with file statistics..."
-	${Q} ./${TARGET} -files
+run-files: build
+	${E} "Running $(TARGET)-gui with file statistics..."
+	${Q} ./${TARGET}-gui -files
 
 # Advanced filtering examples
 .PHONY: run-filter-date
-run-filter-date: ${TARGET}
-	${E} "Running $(TARGET) with date filtering..."
-	${Q} ./${TARGET} -contrib -since "1 month ago"
+run-filter-date: build
+	${E} "Running $(TARGET)-gui with date filtering..."
+	${Q} ./${TARGET}-gui -contrib -since "1 month ago"
 
 .PHONY: run-filter-author
-run-filter-author: ${TARGET}
-	${E} "Running $(TARGET) with author filtering..."
-	${Q} ./${TARGET} -contributors -author "$(shell git config user.name)"
+run-filter-author: build
+	${E} "Running $(TARGET)-gui with author filtering..."
+	${Q} ./${TARGET}-gui -contributors -author "$(shell git config user.name)"
 
 .PHONY: run-filter-combined
-run-filter-combined: ${TARGET}
-	${E} "Running $(TARGET) with combined filters..."
-	${Q} ./${TARGET} -summary -since "3 months ago" -author "$(shell git config user.name)" -format json
+run-filter-combined: build
+	${E} "Running $(TARGET)-gui with combined filters..."
+	${Q} ./${TARGET}-gui -summary -since "3 months ago" -author "$(shell git config user.name)" -format json
 
 .PHONY: run-config-demo
-run-config-demo: ${TARGET}
-	${E} "Running $(TARGET) configuration demo..."
-	${Q} ./${TARGET} --show-config || ./${TARGET} -help
+run-config-demo: build
+	${E} "Running $(TARGET)-gui configuration demo..."
+	${Q} ./${TARGET}-gui --show-config || ./${TARGET}-gui -help
 
 .PHONY: dev
 dev:
-	${E} "Starting development mode..."
-	${Q} cd $(SRC_DIR) && ${GO} run .
+	${E} "Starting development mode with GUI..."
+	${Q} cd $(SRC_DIR) && ${GO} run -tags gui .
 
 # GUI targets
 .PHONY: gui
@@ -332,14 +336,33 @@ deps-vendor:
 
 # Installation targets
 .PHONY: install
-install: ${TARGET}
-	${E} "Installing $(TARGET)..."
+install: build
+	${E} "Installing $(TARGET) and $(TARGET)-gui..."
+	${Q} if [ -f $(TARGET)-gui ]; then \
+		cp $(TARGET)-gui /usr/local/bin/; \
+		echo "$(TARGET)-gui installed successfully"; \
+	fi
+	${Q} if [ -f $(TARGET) ]; then \
+		cp $(TARGET) /usr/local/bin/; \
+		echo "$(TARGET) installed successfully"; \
+	fi
+
+.PHONY: install-gui
+install-gui: ${TARGET}-gui
+	${E} "Installing $(TARGET)-gui..."
+	${Q} cp $(TARGET)-gui /usr/local/bin/
+
+.PHONY: install-all
+install-all: ${TARGET} ${TARGET}-gui
+	${E} "Installing both $(TARGET) and $(TARGET)-gui..."
 	${Q} cp $(TARGET) /usr/local/bin/
+	${Q} cp $(TARGET)-gui /usr/local/bin/
 
 .PHONY: uninstall
 uninstall:
 	${E} "Uninstalling $(TARGET)..."
 	${Q} rm -f /usr/local/bin/$(TARGET)
+	${Q} rm -f /usr/local/bin/$(TARGET)-gui
 
 # Distribution targets
 .PHONY: dist
@@ -383,10 +406,10 @@ help:
 	@echo "================================================="
 	@echo ""
 	@echo "Quick Start:"
-	@echo "  make build                    # Build the application"
-	@echo "  ./git-stats -help             # Show application help"
-	@echo "  ./git-stats -contrib          # Show contribution graph"
-	@echo "  ./git-stats -summary          # Show repository summary"
+	@echo "  make build                    # Build the application with GUI support"
+	@echo "  ./git-stats-gui -help         # Show application help"
+	@echo "  ./git-stats-gui -contrib      # Show contribution graph"
+	@echo "  ./git-stats-gui -gui          # Launch GUI mode"
 	@echo ""
 	@echo "GUI Mode:"
 	@echo "  make check-gui-deps           # Check if GUI dependencies are available"
@@ -397,10 +420,11 @@ help:
 	@echo "Available targets:"
 	@echo ""
 	@echo "Build Targets:"
-	@echo "  build          - Build the application"
+	@echo "  build          - Build the application with GUI support (default)"
+	@echo "  build-terminal - Build terminal-only version"
 	@echo "  build-gui      - Build the application with GUI support"
 	@echo "  build-gui-offline - Build GUI with existing dependencies only"
-	@echo "  rebuild        - Clean and build"
+	@echo "  rebuild        - Clean and build with GUI support"
 	@echo "  rebuild-gui    - Clean and build with GUI support"
 	@echo "  rebuild-gui-offline - Clean and build GUI offline"
 	@echo "  debug          - Build debug version"
@@ -468,8 +492,10 @@ help:
 	${E} "  deps-vendor    - Vendor dependencies"
 	${E} ""
 	${E} "Installation Targets:"
-	${E} "  install        - Install to /usr/local/bin"
-	${E} "  uninstall      - Remove from /usr/local/bin"
+	${E} "  install        - Install git-stats (and git-stats-gui if available)"
+	${E} "  install-gui    - Install git-stats-gui only"
+	${E} "  install-all    - Install both git-stats and git-stats-gui"
+	${E} "  uninstall      - Remove both binaries from /usr/local/bin"
 	${E} ""
 	${E} "Distribution Targets:"
 	${E} "  dist           - Create distribution binaries"
