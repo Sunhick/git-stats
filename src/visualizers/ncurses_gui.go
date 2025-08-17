@@ -178,7 +178,7 @@ func (cgw *ContributionGraphWidget) Draw(screen tcell.Screen) {
 	x, y, width, height := cgw.GetInnerRect()
 
 	if cgw.Data == nil {
-		tview.Print(screen, "No contribution data available", x, y, width, tcell.AlignLeft, tcell.ColorWhite)
+		tview.Print(screen, "No contribution data available", x, y, width, tview.AlignLeft, tcell.ColorWhite)
 		return
 	}
 
@@ -200,7 +200,7 @@ func (cgw *ContributionGraphWidget) drawMonthLabels(screen tcell.Screen, x, y, w
 	startMonth := cgw.State.ViewStartDate.Month()
 	for i := 0; i < 12 && i*8 < width-4; i++ {
 		monthIndex := (int(startMonth) - 1 + i) % 12
-		tview.Print(screen, months[monthIndex], x+4+i*8, y, 3, tcell.AlignLeft, tcell.ColorYellow)
+		tview.Print(screen, months[monthIndex], x+4+i*8, y, 3, tview.AlignLeft, tcell.ColorYellow)
 	}
 }
 
@@ -209,7 +209,7 @@ func (cgw *ContributionGraphWidget) drawDayIndicators(screen tcell.Screen, x, y,
 	days := []string{"S", "M", "T", "W", "T", "F", "S"}
 	for i, day := range days {
 		if i < height {
-			tview.Print(screen, day, x, y+i, 1, tcell.AlignLeft, tcell.ColorCyan)
+			tview.Print(screen, day, x, y+i, 1, tview.AlignLeft, tcell.ColorNames["cyan"])
 		}
 	}
 }
@@ -325,36 +325,48 @@ func (cgw *ContributionGraphWidget) getCellChar(commits int) rune {
 func (cgw *ContributionGraphWidget) HandleInput(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyLeft:
+		// Check for Ctrl modifier for month navigation
+		if event.Modifiers()&tcell.ModCtrl != 0 {
+			cgw.State.NavigateMonth(-1)
+			return nil
+		}
+		// Navigate day left
 		newDate := cgw.State.SelectedDate.AddDate(0, 0, -1)
 		cgw.State.SelectDate(newDate)
 		cgw.updateSelectedCommits()
 		return nil
 	case tcell.KeyRight:
+		// Check for Ctrl modifier for month navigation
+		if event.Modifiers()&tcell.ModCtrl != 0 {
+			cgw.State.NavigateMonth(1)
+			return nil
+		}
+		// Navigate day right
 		newDate := cgw.State.SelectedDate.AddDate(0, 0, 1)
 		cgw.State.SelectDate(newDate)
 		cgw.updateSelectedCommits()
 		return nil
 	case tcell.KeyUp:
+		// Check for Ctrl modifier for year navigation
+		if event.Modifiers()&tcell.ModCtrl != 0 {
+			cgw.State.NavigateYear(-1)
+			return nil
+		}
+		// Navigate week up
 		newDate := cgw.State.SelectedDate.AddDate(0, 0, -7)
 		cgw.State.SelectDate(newDate)
 		cgw.updateSelectedCommits()
 		return nil
 	case tcell.KeyDown:
+		// Check for Ctrl modifier for year navigation
+		if event.Modifiers()&tcell.ModCtrl != 0 {
+			cgw.State.NavigateYear(1)
+			return nil
+		}
+		// Navigate week down
 		newDate := cgw.State.SelectedDate.AddDate(0, 0, 7)
 		cgw.State.SelectDate(newDate)
 		cgw.updateSelectedCommits()
-		return nil
-	case tcell.KeyCtrlLeft:
-		cgw.State.NavigateMonth(-1)
-		return nil
-	case tcell.KeyCtrlRight:
-		cgw.State.NavigateMonth(1)
-		return nil
-	case tcell.KeyCtrlUp:
-		cgw.State.NavigateYear(-1)
-		return nil
-	case tcell.KeyCtrlDown:
-		cgw.State.NavigateYear(1)
 		return nil
 	}
 
@@ -422,6 +434,12 @@ func (cgw *ContributionGraphWidget) updateSelectedCommits() {
 	}
 
 	cgw.State.UpdateSelectedCommits(commits)
+}
+
+// UpdateContent updates the contribution graph content (required for initialization)
+func (cgw *ContributionGraphWidget) UpdateContent() {
+	// Update selected commits for the current date
+	cgw.updateSelectedCommits()
 }
 
 // DetailPanelWidget displays detailed information with enhanced functionality
@@ -814,11 +832,12 @@ func (gui *GUIInterface) Run(data *models.AnalysisResult) error {
 	// Set up input handling
 	gui.app.SetInputCapture(gui.handleGlobalInput)
 
-	// Update initial content
-	gui.updateDisplay()
-
 	// Set root and run
 	gui.app.SetRoot(gui.layout, true)
+
+	// Update initial content synchronously before starting the app
+	gui.updateDisplayContent()
+
 	return gui.app.Run()
 }
 
@@ -994,12 +1013,12 @@ func (gui *GUIInterface) handleTextViewInput(event *tcell.EventKey) *tcell.Event
 			gui.scrollDetailPanel(1)
 		}
 		return nil
-	case tcell.KeyPageUp:
+	case tcell.KeyPgUp:
 		if gui.detailPanel != nil {
 			gui.scrollDetailPanel(-5)
 		}
 		return nil
-	case tcell.KeyPageDown:
+	case tcell.KeyPgDn:
 		if gui.detailPanel != nil {
 			gui.scrollDetailPanel(5)
 		}
@@ -1055,6 +1074,19 @@ func (gui *GUIInterface) updateDisplay() {
 	}
 }
 
+// updateDisplayContent updates display content without calling Draw (safe for initialization)
+func (gui *GUIInterface) updateDisplayContent() {
+	if gui.contributionGraph != nil {
+		gui.contributionGraph.UpdateContent()
+	}
+	if gui.detailPanel != nil {
+		gui.detailPanel.UpdateContent()
+	}
+	if gui.statusBar != nil {
+		gui.statusBar.UpdateStatus()
+	}
+}
+
 // HandleInput processes input events (part of GUIVisualizer interface)
 func (gui *GUIInterface) HandleInput() error {
 	// Input handling is managed by tview application
@@ -1101,11 +1133,11 @@ func (dpw *DetailPanelWidget) HandleInput(event *tcell.EventKey) *tcell.EventKey
 			dpw.UpdateContent()
 		}
 		return nil
-	case tcell.KeyPageUp:
+	case tcell.KeyPgUp:
 		dpw.SelectedCommitIndex = 0
 		dpw.UpdateContent()
 		return nil
-	case tcell.KeyPageDown:
+	case tcell.KeyPgDn:
 		if len(dpw.State.SelectedCommits) > 0 {
 			dpw.SelectedCommitIndex = len(dpw.State.SelectedCommits) - 1
 			dpw.UpdateContent()

@@ -84,6 +84,9 @@ $ make deps-gui
 # Build with GUI support (requires network for dependencies)
 $ make build-gui
 
+# Build with GUI support using direct proxy (for network issues)
+$ GOPROXY=direct make build-gui
+
 # Build GUI in offline mode (uses stub if dependencies missing)
 $ make build-gui-offline
 
@@ -136,6 +139,9 @@ $ make deps-gui
 
 # Build with GUI support
 $ make build-gui
+
+# Build with GUI support using direct proxy (for network issues)
+$ GOPROXY=direct make build-gui
 
 # Launch GUI mode (you need to specify repository path)
 $ ./git-stats-gui -gui /path/to/your/repository
@@ -223,6 +229,9 @@ $ make test-gui-all          # All GUI tests
 ```shell
 # If you get "dial tcp: lookup proxy.golang.org: i/o timeout"
 $ make build-gui-offline     # Uses offline build with fallback
+
+# Try direct proxy for network issues
+$ GOPROXY=direct make build-gui
 
 # Check dependency availability
 $ make check-gui-deps
@@ -657,8 +666,10 @@ For more help, run: git-stats -help
 
 **3. Network/proxy issues during GUI build**
 - **Error**: `dial tcp: lookup proxy.golang.org: i/o timeout`
-- **Solution**: Use offline build: `make build-gui-offline`
-- **Alternative**: Configure Go proxy settings or use corporate proxy
+- **Solutions**:
+  - Use offline build: `make build-gui-offline`
+  - Try direct proxy: `GOPROXY=direct make build-gui`
+  - Configure Go proxy settings or use corporate proxy
 
 **4. "Repository not found" or "not a git repository"**
 - **Cause**: Not in a git repository or invalid path
@@ -745,11 +756,12 @@ $ ./git-stats -gui /path/to/repo  # Shows helpful instructions
 
 ### Build Commands
 ```shell
-make build              # Build terminal version
-make build-gui          # Build with GUI (requires network)
-make build-gui-offline  # Build GUI offline (stub if deps missing)
-make check-gui-deps     # Check GUI dependency status
-make help               # Show all make targets
+make build                    # Build terminal version
+make build-gui                # Build with GUI (requires network)
+GOPROXY=direct make build-gui # Build with GUI using direct proxy
+make build-gui-offline        # Build GUI offline (stub if deps missing)
+make check-gui-deps           # Check GUI dependency status
+make help                     # Show all make targets
 ```
 
 ### Usage Patterns

@@ -13,5 +13,6 @@
 
 # Executable
 git-stats
+git-stats-gui
 *~
 .kiro
