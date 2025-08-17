@@ -165,8 +165,12 @@ bench-filters:
 # Development targets
 .PHONY: run
 run: ${TARGET}
-	${E} "Running $(TARGET)..."
-	${Q} ./${TARGET}
+	@echo "Running $(TARGET)..."
+	@echo "Usage: ./${TARGET} [options] [repository-path]"
+	@echo "Examples:"
+	@echo "  ./${TARGET} -contrib"
+	@echo "  ./${TARGET} -summary /path/to/repo"
+	@echo "  ./${TARGET} -help"
 
 .PHONY: run-summary
 run-summary: ${TARGET}
@@ -223,7 +227,9 @@ dev:
 .PHONY: gui
 gui: ${TARGET}-gui
 	@echo "Launching GUI mode..."
-	@./${TARGET}-gui -gui /Users/sunilmur/work/acme-cicd/src/ACMECICDInfraCDK
+	@echo "Usage: ./${TARGET}-gui -gui [repository-path]"
+	@echo "Example: ./${TARGET}-gui -gui /path/to/your/repo"
+	@echo "Note: GUI requires building with -tags gui for full functionality"
 
 .PHONY: gui-offline
 gui-offline: ${TARGET}-gui-offline
@@ -289,10 +295,12 @@ deps:
 
 .PHONY: deps-gui
 deps-gui:
-	${E} "Installing GUI dependencies..."
-	${Q} cd $(SRC_DIR) && ${GO} get github.com/gdamore/tcell/v2@v2.6.0 || (${E} "Warning: Failed to download tcell dependency. Network issue or proxy required.")
-	${Q} cd $(SRC_DIR) && ${GO} get github.com/rivo/tview@v0.0.0-20230826224341-9754ab44dc1c || (${E} "Warning: Failed to download tview dependency. Network issue or proxy required.")
-	${Q} cd $(SRC_DIR) && ${GO} mod tidy || true
+	@echo "Installing GUI dependencies..."
+	@echo "Attempting to download tcell and tview packages..."
+	@cd $(SRC_DIR) && (${GO} get github.com/gdamore/tcell/v2@v2.6.0 && echo "✓ tcell downloaded successfully") || echo "⚠ Failed to download tcell - network issue or proxy required"
+	@cd $(SRC_DIR) && (${GO} get github.com/rivo/tview@v0.0.0-20230826224341-9754ab44dc1c && echo "✓ tview downloaded successfully") || echo "⚠ Failed to download tview - network issue or proxy required"
+	@cd $(SRC_DIR) && ${GO} mod tidy || true
+	@echo "Note: If dependencies failed to download, GUI will use stub implementation"
 
 .PHONY: deps-gui-offline
 deps-gui-offline:
@@ -303,9 +311,13 @@ deps-gui-offline:
 
 .PHONY: check-gui-deps
 check-gui-deps:
-	${E} "Checking GUI dependencies availability..."
-	${Q} cd $(SRC_DIR) && (${GO} list -m github.com/gdamore/tcell/v2 >/dev/null 2>&1 && echo "✓ tcell dependency available") || echo "✗ tcell dependency missing"
-	${Q} cd $(SRC_DIR) && (${GO} list -m github.com/rivo/tview >/dev/null 2>&1 && echo "✓ tview dependency available") || echo "✗ tview dependency missing"
+	@echo "Checking GUI dependencies availability..."
+	@cd $(SRC_DIR) && (${GO} list -m github.com/gdamore/tcell/v2 >/dev/null 2>&1 && echo "✓ tcell dependency available") || echo "✗ tcell dependency missing"
+	@cd $(SRC_DIR) && (${GO} list -m github.com/rivo/tview >/dev/null 2>&1 && echo "✓ tview dependency available") || echo "✗ tview dependency missing"
+	@echo ""
+	@echo "If dependencies are missing:"
+	@echo "  1. Run 'make deps-gui' to download them (requires network)"
+	@echo "  2. Or use 'make build-gui-offline' for stub implementation"
 
 .PHONY: deps-update
 deps-update:
@@ -367,16 +379,31 @@ clean-all: clean
 # Help target
 .PHONY: help
 help:
-	${E} "Available targets:"
-	${E} ""
-	${E} "Build Targets:"
-	${E} "  build          - Build the application"
-	${E} "  build-gui      - Build the application with GUI support"
-	${E} "  build-gui-offline - Build GUI with existing dependencies only"
-	${E} "  rebuild        - Clean and build"
-	${E} "  rebuild-gui    - Clean and build with GUI support"
-	${E} "  rebuild-gui-offline - Clean and build GUI offline"
-	${E} "  debug          - Build debug version"
+	@echo "Git Stats - Enhanced Git Repository Analysis Tool"
+	@echo "================================================="
+	@echo ""
+	@echo "Quick Start:"
+	@echo "  make build                    # Build the application"
+	@echo "  ./git-stats -help             # Show application help"
+	@echo "  ./git-stats -contrib          # Show contribution graph"
+	@echo "  ./git-stats -summary          # Show repository summary"
+	@echo ""
+	@echo "GUI Mode:"
+	@echo "  make check-gui-deps           # Check if GUI dependencies are available"
+	@echo "  make deps-gui                 # Download GUI dependencies (requires network)"
+	@echo "  make build-gui                # Build with GUI support"
+	@echo "  make build-gui-offline        # Build GUI (offline mode, uses stub if deps missing)"
+	@echo ""
+	@echo "Available targets:"
+	@echo ""
+	@echo "Build Targets:"
+	@echo "  build          - Build the application"
+	@echo "  build-gui      - Build the application with GUI support"
+	@echo "  build-gui-offline - Build GUI with existing dependencies only"
+	@echo "  rebuild        - Clean and build"
+	@echo "  rebuild-gui    - Clean and build with GUI support"
+	@echo "  rebuild-gui-offline - Clean and build GUI offline"
+	@echo "  debug          - Build debug version"
 	${E} ""
 	${E} "Test Targets:"
 	${E} "  test           - Run all tests"

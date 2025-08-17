@@ -36,6 +36,15 @@ The application is built with a modular architecture:
 
 ## Quick Start
 
+### Automated Setup
+```shell
+# Clone and run quick setup
+$ git clone <repository-url>
+$ cd git-stats
+$ ./quick-start.sh
+```
+
+### Manual Setup
 ```shell
 # Clone and build
 $ git clone <repository-url>
@@ -45,31 +54,72 @@ $ make build
 # Show help
 $ ./git-stats -help
 
-# Basic usage (run from any git repository)
-$ ./git-stats                    # Show contribution graph
-$ ./git-stats -summary           # Show repository summary
-$ ./git-stats -gui               # Launch interactive GUI
+# Basic usage - remember: flags first, then repository path
+$ ./git-stats -contrib                    # Show contribution graph (current directory)
+$ ./git-stats -summary /path/to/repo      # Show repository summary
+$ ./git-stats -contributors /path/to/repo # Show contributor analysis
+$ ./git-stats -health /path/to/repo       # Show repository health metrics
+
+# Note: Use format: git-stats [flags] [repository-path]
+# NOT: git-stats [repository-path] [flags]
 ```
 
 ## Build & Install
 
+### Using Make (Recommended)
+
 ```shell
-# Build the application
+# Show all available targets with descriptions
+$ make help
+
+# Build the application (terminal mode only)
 $ make build
 
-# Build with GUI support
+# Check if GUI dependencies are available
+$ make check-gui-deps
+
+# Download GUI dependencies (requires network)
+$ make deps-gui
+
+# Build with GUI support (requires network for dependencies)
 $ make build-gui
+
+# Build GUI in offline mode (uses stub if dependencies missing)
+$ make build-gui-offline
 
 # Install to /usr/local/bin
 $ make install
 
-# Or build and run directly
-$ make run
-
-# Run specific commands
-$ make run-contrib    # Test contribution graph
-$ make run-summary    # Test repository summary
+# Clean build artifacts
+$ make clean
 ```
+
+### Manual Build
+
+```shell
+# Terminal version
+$ cd src && go build -o git-stats .
+
+# GUI version (requires dependencies)
+$ cd src && go build -tags gui -o git-stats-gui .
+
+# Check dependencies first
+$ cd src && go mod tidy
+```
+
+### Make Targets Overview
+
+The Makefile provides comprehensive build automation:
+
+- **Build Targets**: `build`, `build-gui`, `build-gui-offline`, `rebuild`, `debug`
+- **Test Targets**: `test`, `test-gui`, `test-integration`, `test-coverage`
+- **Development**: `run`, `dev`, `gui`, various `run-*` targets for testing
+- **Dependencies**: `deps`, `deps-gui`, `check-gui-deps`
+- **Quality**: `fmt`, `vet`, `lint`, `check`
+- **Distribution**: `dist`, `dist-gui`, `install`, `uninstall`
+- **Cleanup**: `clean`, `clean-all`
+
+Run `make help` for the complete list with descriptions.
 
 ## GUI Mode
 
@@ -78,19 +128,22 @@ The application includes a full-featured interactive ncurses GUI with keyboard n
 ### Building and Running GUI
 
 ```shell
-# Install GUI dependencies and build
+# Check if GUI dependencies are available
+$ make check-gui-deps
+
+# Install GUI dependencies (requires network access)
+$ make deps-gui
+
+# Build with GUI support
 $ make build-gui
 
-# Launch GUI mode
-$ make gui
+# Launch GUI mode (you need to specify repository path)
+$ ./git-stats-gui -gui /path/to/your/repository
 
-# Or launch with specific views
-$ make run-gui-contrib      # Start with contribution graph
-$ make run-gui-summary      # Start with summary view
-$ make run-gui-contributors # Start with contributors view
-$ make run-gui-health       # Start with health metrics
+# Alternative: Use make target for guidance
+$ make gui  # Shows usage instructions
 
-# Development mode with GUI
+# Development mode with GUI (if dependencies available)
 $ make dev-gui
 ```
 
@@ -105,15 +158,20 @@ $ make check-gui-deps
 # Build GUI in offline mode (uses existing dependencies or falls back to stub)
 $ make build-gui-offline
 
-# Launch GUI in offline mode
-$ make gui-offline
+# The offline build creates git-stats-gui binary
+$ ./git-stats-gui -gui /path/to/repo
 
 # Alternative: Build without GUI dependencies (uses stub implementation)
 $ make build
-$ ./git-stats -gui  # Will show message about GUI mode requiring build tags
+$ ./git-stats -gui /path/to/repo  # Will show helpful error message with instructions
 ```
 
-**Note**: The offline build will automatically fall back to a stub implementation if GUI dependencies (tcell and tview) are not available. The stub provides the same API but displays a message that GUI mode requires building with `-tags gui`.
+**Note**: The offline build will automatically fall back to a stub implementation if GUI dependencies (tcell and tview) are not available. The stub provides the same API but displays a helpful message explaining how to enable full GUI mode.
+
+**Common Network Issues:**
+- `dial tcp: lookup proxy.golang.org: i/o timeout` - Use `make build-gui-offline`
+- `missing go.sum entry` - Dependencies not downloaded, use offline build
+- Corporate firewalls/proxies - Use offline build or configure Go proxy settings
 
 ### GUI Features
 
@@ -226,21 +284,35 @@ After building, you can add the folder containing `git-stats` to your PATH varia
 
 ### Basic Usage
 
+**Important**: Use the format `git-stats [flags] [repository-path]`, not `git-stats [repository-path] [flags]`
+
 ```shell
-# Show contribution graph (default)
+# Show contribution graph (default) - current directory
 $ git-stats
 
+# Show contribution graph for specific repository
+$ git-stats -contrib /path/to/repository
+
 # Show detailed repository statistics
-$ git-stats -summary
+$ git-stats -summary /path/to/repository
 
 # Show contributor statistics
-$ git-stats -contributors
+$ git-stats -contributors /path/to/repository
 
 # Show repository health metrics
-$ git-stats -health
+$ git-stats -health /path/to/repository
 
-# Launch interactive GUI
-$ git-stats -gui
+# Launch interactive GUI (requires GUI build)
+$ git-stats -gui /path/to/repository
+```
+
+**Common Mistake**: Putting the repository path before flags won't work:
+```shell
+# ❌ Wrong - flags after path are ignored
+$ git-stats /path/to/repo -summary
+
+# ✅ Correct - flags before path
+$ git-stats -summary /path/to/repo
 ```
 
 ### Advanced Filtering System
@@ -566,6 +638,76 @@ Example: git-stats -since "2024-01-01" -until "2024-12-31"
 For more help, run: git-stats -help
 ```
 
+## Troubleshooting
+
+### Common Issues
+
+**1. All commands show the same output**
+- **Cause**: Incorrect argument order
+- **Solution**: Use `git-stats [flags] [repository-path]`, not `git-stats [repository-path] [flags]`
+- **Example**: `git-stats -summary /path/to/repo` ✅, not `git-stats /path/to/repo -summary` ❌
+
+**2. GUI mode shows "requires building with -tags gui"**
+- **Cause**: GUI dependencies not available during build
+- **Solutions**:
+  - Check dependencies: `make check-gui-deps`
+  - Download dependencies: `make deps-gui` (requires network)
+  - Build with GUI: `make build-gui`
+  - Use offline build: `make build-gui-offline`
+
+**3. Network/proxy issues during GUI build**
+- **Error**: `dial tcp: lookup proxy.golang.org: i/o timeout`
+- **Solution**: Use offline build: `make build-gui-offline`
+- **Alternative**: Configure Go proxy settings or use corporate proxy
+
+**4. "Repository not found" or "not a git repository"**
+- **Cause**: Not in a git repository or invalid path
+- **Solution**:
+  - Run from within a git repository, or
+  - Specify valid repository path: `git-stats -summary /path/to/git/repo`
+
+**5. Make command not found (@echo error)**
+- **Cause**: Makefile syntax issues (now fixed)
+- **Solution**: Use updated Makefile or build directly: `cd src && go build -o git-stats .`
+
+### Build Issues
+
+```shell
+# Check system requirements
+$ go version  # Requires Go 1.19+
+$ git --version  # Requires Git
+
+# Clean build
+$ make clean
+$ make build
+
+# Debug build issues
+$ make debug
+$ cd src && go build -v .
+
+# Check dependencies
+$ cd src && go mod tidy
+$ cd src && go mod verify
+```
+
+### GUI-Specific Issues
+
+```shell
+# Check GUI dependencies status
+$ make check-gui-deps
+
+# Try offline GUI build
+$ make build-gui-offline
+
+# Manual dependency check
+$ cd src && go list -m github.com/gdamore/tcell/v2
+$ cd src && go list -m github.com/rivo/tview
+
+# Build without GUI (uses stub)
+$ make build
+$ ./git-stats -gui /path/to/repo  # Shows helpful instructions
+```
+
 ## New Features in Latest Version
 
 ### Advanced Filtering System
@@ -598,3 +740,53 @@ For more help, run: git-stats -help
 - **Parallel Processing**: Configurable parallel processing with worker pools
 - **Memory Optimization**: Efficient memory usage for large datasets
 - **Caching Support**: Optional caching for repeated operations
+
+## Quick Reference
+
+### Build Commands
+```shell
+make build              # Build terminal version
+make build-gui          # Build with GUI (requires network)
+make build-gui-offline  # Build GUI offline (stub if deps missing)
+make check-gui-deps     # Check GUI dependency status
+make help               # Show all make targets
+```
+
+### Usage Patterns
+```shell
+# Terminal analysis
+git-stats -contrib /path/to/repo
+git-stats -summary /path/to/repo
+git-stats -contributors /path/to/repo
+git-stats -health /path/to/repo
+
+# Output formats
+git-stats -summary -format json /path/to/repo
+git-stats -contributors -format csv /path/to/repo
+
+# Date filtering
+git-stats -contrib -since "1 month ago" /path/to/repo
+git-stats -summary -since "2024-01-01" -until "2024-12-31" /path/to/repo
+
+# GUI mode (requires GUI build)
+git-stats -gui /path/to/repo
+```
+
+### Common Flags
+- `-contrib`: Contribution graph (default)
+- `-summary`: Repository statistics
+- `-contributors`: Contributor analysis
+- `-health`: Repository health metrics
+- `-gui`: Interactive GUI mode
+- `-format json|csv|terminal`: Output format
+- `-since "date"`: Start date filter
+- `-until "date"`: End date filter
+- `-author "name"`: Author filter
+- `-limit N`: Limit commits processed
+- `-help`: Show help
+
+### Remember
+- **Argument order**: `git-stats [flags] [repository-path]`
+- **GUI requires**: Build with `make build-gui` or `make build-gui-offline`
+- **Network issues**: Use `make build-gui-offline` for offline GUI build
+- **Default directory**: Current directory if no path specified
