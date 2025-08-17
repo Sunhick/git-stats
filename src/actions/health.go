@@ -1,22 +1,5 @@
 // Copyright (c) 2019 Sunil
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Enhanced git-stats tool - Health analysis action
 
 package actions
 
@@ -30,15 +13,17 @@ import (
 	"time"
 )
 
-func Contrib() {
-	ContribWithConfig(nil)
+// Health executes the health analysis with default configuration
+func Health() {
+	HealthWithConfig(nil)
 }
 
-func ContribWithConfig(config *cli.Config) {
+// HealthWithConfig executes the health analysis with the given configuration
+func HealthWithConfig(config *cli.Config) {
 	// Use default config if none provided
 	if config == nil {
 		config = &cli.Config{
-			Command:  "contrib",
+			Command:  "health",
 			RepoPath: ".",
 			Format:   "terminal",
 			Limit:    10000,
@@ -131,11 +116,11 @@ func ContribWithConfig(config *cli.Config) {
 		Limit:         config.Limit,
 	}
 
-	// Analyze contributions
-	contribAnalyzer := analyzers.NewContributionAnalyzer()
-	contribGraph, err := contribAnalyzer.AnalyzeContributions(modelCommits, analysisConfig)
+	// Analyze health metrics
+	healthAnalyzer := analyzers.NewHealthAnalyzer()
+	healthMetrics, err := healthAnalyzer.AnalyzeHealth(modelCommits, modelContributors, analysisConfig)
 	if err != nil {
-		fmt.Printf("Error analyzing contributions: %v\n", err)
+		fmt.Printf("Error analyzing health: %v\n", err)
 		return
 	}
 
@@ -147,11 +132,11 @@ func ContribWithConfig(config *cli.Config) {
 		return
 	}
 
-	// Analyze health metrics
-	healthAnalyzer := analyzers.NewHealthAnalyzer()
-	healthMetrics, err := healthAnalyzer.AnalyzeHealth(modelCommits, modelContributors, analysisConfig)
+	// Analyze contributions for additional context
+	contribAnalyzer := analyzers.NewContributionAnalyzer()
+	contribGraph, err := contribAnalyzer.AnalyzeContributions(modelCommits, analysisConfig)
 	if err != nil {
-		fmt.Printf("Error analyzing health: %v\n", err)
+		fmt.Printf("Error analyzing contributions: %v\n", err)
 		return
 	}
 
@@ -182,7 +167,7 @@ func ContribWithConfig(config *cli.Config) {
 	case "csv":
 		err = outputCSV(analysisResult, config)
 	default:
-		err = outputTerminal(analysisResult, config, "contrib")
+		err = outputTerminal(analysisResult, config, "health")
 	}
 
 	if err != nil {
@@ -190,7 +175,3 @@ func ContribWithConfig(config *cli.Config) {
 		return
 	}
 }
-
-
-
-

@@ -175,7 +175,7 @@ func (d *CommandDispatcher) executeContribCommand(config *cli.Config) error {
 		return nil
 	}
 
-	// The existing ContribWithConfig function handles its own errors
+	// The ContribWithConfig function handles its own errors
 	// and prints directly to stdout/stderr, so we just call it
 	ContribWithConfig(config)
 	return nil
@@ -194,7 +194,7 @@ func (d *CommandDispatcher) executeSummaryCommand(config *cli.Config) error {
 		return nil
 	}
 
-	Summarize()
+	SummarizeWithConfig(config)
 	return nil
 }
 
@@ -211,8 +211,8 @@ func (d *CommandDispatcher) executeContributorsCommand(config *cli.Config) error
 		return nil
 	}
 
-	// TODO: Implement contributors command when the action is available
-	return NewCommandError(ErrNotImplemented, "Contributors analysis is not yet implemented", nil)
+	ContributorsWithConfig(config)
+	return nil
 }
 
 // executeHealthCommand executes the repository health analysis command
@@ -228,8 +228,8 @@ func (d *CommandDispatcher) executeHealthCommand(config *cli.Config) error {
 		return nil
 	}
 
-	// TODO: Implement health command when the action is available
-	return NewCommandError(ErrNotImplemented, "Health analysis is not yet implemented", nil)
+	HealthWithConfig(config)
+	return nil
 }
 
 // CommandErrorType represents different types of command errors

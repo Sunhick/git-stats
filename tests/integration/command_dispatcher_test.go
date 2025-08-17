@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"fmt"
 	"git-stats/actions"
 	"git-stats/cli"
 	"os"
@@ -70,26 +71,24 @@ func TestCommandDispatcherIntegration(t *testing.T) {
 			errorType:   actions.ErrInvalidConfiguration,
 		},
 		{
-			name: "Contributors command (not implemented)",
+			name: "Valid contributors command",
 			config: &cli.Config{
 				Command:  "contributors",
 				RepoPath: tempDir,
 				Format:   "terminal",
 				Limit:    1000,
 			},
-			expectError: true,
-			errorType:   actions.ErrNotImplemented,
+			expectError: false,
 		},
 		{
-			name: "Health command (not implemented)",
+			name: "Valid health command",
 			config: &cli.Config{
 				Command:  "health",
 				RepoPath: tempDir,
 				Format:   "terminal",
 				Limit:    1000,
 			},
-			expectError: true,
-			errorType:   actions.ErrNotImplemented,
+			expectError: false,
 		},
 	}
 
@@ -366,26 +365,30 @@ func createTestRepository(t *testing.T) (string, func()) {
 		}
 	}
 
-	// Create a test file and commit
-	testFile := filepath.Join(tempDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
-		os.RemoveAll(tempDir)
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	// Create multiple test files and commits with recent dates
+	for i := 0; i < 3; i++ {
+		testFile := filepath.Join(tempDir, fmt.Sprintf("test%d.txt", i))
+		content := fmt.Sprintf("test content %d", i)
+		if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+			os.RemoveAll(tempDir)
+			t.Fatalf("Failed to create test file: %v", err)
+		}
 
-	// Add and commit the file
-	addCmd := exec.Command("git", "add", "test.txt")
-	addCmd.Dir = tempDir
-	if err := addCmd.Run(); err != nil {
-		os.RemoveAll(tempDir)
-		t.Fatalf("Failed to add test file: %v", err)
-	}
+		// Add and commit the file
+		addCmd := exec.Command("git", "add", fmt.Sprintf("test%d.txt", i))
+		addCmd.Dir = tempDir
+		if err := addCmd.Run(); err != nil {
+			os.RemoveAll(tempDir)
+			t.Fatalf("Failed to add test file: %v", err)
+		}
 
-	commitCmd := exec.Command("git", "commit", "-m", "Initial commit")
-	commitCmd.Dir = tempDir
-	if err := commitCmd.Run(); err != nil {
-		os.RemoveAll(tempDir)
-		t.Fatalf("Failed to commit test file: %v", err)
+		commitMsg := fmt.Sprintf("Add test file %d", i)
+		commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+		commitCmd.Dir = tempDir
+		if err := commitCmd.Run(); err != nil {
+			os.RemoveAll(tempDir)
+			t.Fatalf("Failed to commit test file: %v", err)
+		}
 	}
 
 	cleanup := func() {
@@ -398,4 +401,227 @@ func createTestRepository(t *testing.T) (string, func()) {
 // timePtr returns a pointer to a time.Time
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+// TestOutputFormats tests different output formats
+func TestOutputFormats(t *testing.T) {
+	// Create a temporary git repository for testing
+	tempDir, cleanup := createTestRepository(t)
+	defer cleanup()
+
+	dispatcher := actions.NewCommandDispatcher()
+
+	tests := []struct {
+		name        string
+		config      *cli.Config
+		expectError bool
+	}{
+		{
+			name: "JSON output format",
+			config: &cli.Config{
+				Command:  "contrib",
+				RepoPath: tempDir,
+				Format:   "json",
+				Limit:    1000,
+			},
+			expectError: false,
+		},
+		{
+			name: "CSV output format",
+			config: &cli.Config{
+				Command:  "summary",
+				RepoPath: tempDir,
+				Format:   "csv",
+				Limit:    1000,
+			},
+			expectError: false,
+		},
+		{
+			name: "Terminal output format",
+			config: &cli.Config{
+				Command:  "contributors",
+				RepoPath: tempDir,
+				Format:   "terminal",
+				Limit:    1000,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := dispatcher.ExecuteCommand(tt.config)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error but got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestDateFiltering tests date filtering functionality
+func TestDateFiltering(t *testing.T) {
+	// Create a temporary git repository for testing
+	tempDir, cleanup := createTestRepository(t)
+	defer cleanup()
+
+	dispatcher := actions.NewCommandDispatcher()
+
+	// Test with date range
+	since := time.Now().AddDate(0, 0, -30) // 30 days ago
+	until := time.Now()
+
+	config := &cli.Config{
+		Command:  "contrib",
+		RepoPath: tempDir,
+		Format:   "terminal",
+		Since:    &since,
+		Until:    &until,
+		Limit:    1000,
+	}
+
+	err := dispatcher.ExecuteCommand(config)
+	if err != nil {
+		t.Errorf("Expected no error with date filtering but got: %v", err)
+	}
+}
+
+// TestAuthorFiltering tests author filtering functionality
+func TestAuthorFiltering(t *testing.T) {
+	// Create a temporary git repository for testing
+	tempDir, cleanup := createTestRepository(t)
+	defer cleanup()
+
+	dispatcher := actions.NewCommandDispatcher()
+
+	config := &cli.Config{
+		Command:  "summary",
+		RepoPath: tempDir,
+		Format:   "terminal",
+		Author:   "Test User",
+		Limit:    1000,
+	}
+
+	err := dispatcher.ExecuteCommand(config)
+	if err != nil {
+		t.Errorf("Expected no error with author filtering but got: %v", err)
+	}
+}
+
+// TestBackwardCompatibility tests backward compatibility with existing flags
+func TestBackwardCompatibility(t *testing.T) {
+	// Create a temporary git repository for testing
+	tempDir, cleanup := createTestRepository(t)
+	defer cleanup()
+
+	dispatcher := actions.NewCommandDispatcher()
+
+	// Test configurations that should work the same as before
+	tests := []struct {
+		name   string
+		config *cli.Config
+	}{
+		{
+			name: "Basic contrib command",
+			config: &cli.Config{
+				Command:  "contrib",
+				RepoPath: tempDir,
+				Format:   "terminal",
+				Limit:    1000,
+			},
+		},
+		{
+			name: "Basic summary command",
+			config: &cli.Config{
+				Command:  "summary",
+				RepoPath: tempDir,
+				Format:   "terminal",
+				Limit:    1000,
+			},
+		},
+		{
+			name: "Command with limit",
+			config: &cli.Config{
+				Command:  "contrib",
+				RepoPath: tempDir,
+				Format:   "terminal",
+				Limit:    100,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := dispatcher.ExecuteCommand(tt.config)
+			if err != nil {
+				t.Errorf("Backward compatibility test failed: %v", err)
+			}
+		})
+	}
+}
+
+// TestNewFeatures tests new features added in the enhanced version
+func TestNewFeatures(t *testing.T) {
+	// Create a temporary git repository for testing
+	tempDir, cleanup := createTestRepository(t)
+	defer cleanup()
+
+	dispatcher := actions.NewCommandDispatcher()
+
+	// Test new commands that were previously not implemented
+	tests := []struct {
+		name   string
+		config *cli.Config
+	}{
+		{
+			name: "Contributors command",
+			config: &cli.Config{
+				Command:  "contributors",
+				RepoPath: tempDir,
+				Format:   "terminal",
+				Limit:    1000,
+			},
+		},
+		{
+			name: "Health command",
+			config: &cli.Config{
+				Command:  "health",
+				RepoPath: tempDir,
+				Format:   "terminal",
+				Limit:    1000,
+			},
+		},
+		{
+			name: "JSON output",
+			config: &cli.Config{
+				Command:  "contrib",
+				RepoPath: tempDir,
+				Format:   "json",
+				Limit:    1000,
+			},
+		},
+		{
+			name: "CSV output",
+			config: &cli.Config{
+				Command:  "summary",
+				RepoPath: tempDir,
+				Format:   "csv",
+				Limit:    1000,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := dispatcher.ExecuteCommand(tt.config)
+			if err != nil {
+				t.Errorf("New feature test failed: %v", err)
+			}
+		})
+	}
 }

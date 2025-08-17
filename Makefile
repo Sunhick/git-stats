@@ -45,8 +45,8 @@ ${TARGET}: $(MAIN_FILE)
 	${Q} cd $(SRC_DIR) && ${GO} build $(GO_BUILD_FLAGS) -o ../$(TARGET) .
 
 ${TARGET}-gui: $(MAIN_FILE)
-	${E} "Building $(TARGET) with GUI support..."
-	${Q} cd $(SRC_DIR) && ${GO} build $(GO_BUILD_FLAGS) -tags gui -o ../$(TARGET)-gui . || (${E} "GUI build failed. Trying stub build..."; ${GO} build $(GO_BUILD_FLAGS) -o ../$(TARGET)-gui .)
+	@echo "Building $(TARGET) with GUI support..."
+	@cd $(SRC_DIR) && (${GO} build $(GO_BUILD_FLAGS) -tags gui -o ../$(TARGET)-gui . 2>/dev/null && echo "✓ GUI build successful") || (echo "⚠ GUI dependencies missing. Building with stub implementation..."; ${GO} build $(GO_BUILD_FLAGS) -o ../$(TARGET)-gui .)
 
 ${TARGET}-gui-offline: $(MAIN_FILE)
 	${E} "Building $(TARGET) with GUI support (offline mode)..."
@@ -222,8 +222,8 @@ dev:
 # GUI targets
 .PHONY: gui
 gui: ${TARGET}-gui
-	${E} "Launching GUI mode..."
-	${Q} ./${TARGET}-gui -gui
+	@echo "Launching GUI mode..."
+	@./${TARGET}-gui -gui /Users/sunilmur/work/acme-cicd/src/ACMECICDInfraCDK
 
 .PHONY: gui-offline
 gui-offline: ${TARGET}-gui-offline

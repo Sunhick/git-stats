@@ -151,7 +151,7 @@ func (gui *GUIInterface) Initialize() error {
 // Run starts the GUI with the provided data (stub implementation)
 func (gui *GUIInterface) Run(data *models.AnalysisResult) error {
 	gui.state = NewGUIState(data)
-	return fmt.Errorf("GUI mode requires building with -tags gui")
+	return fmt.Errorf("GUI mode requires building with -tags gui\n\nTo enable GUI mode:\n1. Run: go build -tags gui -o git-stats .\n2. Then use: ./git-stats -gui /path/to/repo\n\nAlternatively, use terminal mode:\n- git-stats -contrib /path/to/repo\n- git-stats -summary /path/to/repo")
 }
 
 // HandleInput processes input events (stub implementation)

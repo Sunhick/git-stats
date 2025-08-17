@@ -23,27 +23,42 @@ package actions
 import (
 	"fmt"
 	"git-stats/analyzers"
+	"git-stats/cli"
 	"git-stats/git"
 	"git-stats/models"
-	"git-stats/visualizers"
 	"os"
 	"time"
 )
 
 func Summarize() {
-	fmt.Println("Git Repository Summary")
-	fmt.Println("======================")
+	SummarizeWithConfig(nil)
+}
 
-	// Get current working directory
-	workingDir, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		return
+func SummarizeWithConfig(config *cli.Config) {
+	// Use default config if none provided
+	if config == nil {
+		config = &cli.Config{
+			Command:  "summary",
+			RepoPath: ".",
+			Format:   "terminal",
+			Limit:    10000,
+		}
+	}
+
+	// Get repository path
+	repoPath := config.RepoPath
+	if repoPath == "" {
+		var err error
+		repoPath, err = os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current directory: %v\n", err)
+			return
+		}
 	}
 
 	// Create git repository instance
 	repoConfig := git.RepositoryConfig{
-		Path: workingDir,
+		Path: repoPath,
 	}
 
 	repo, err := git.NewGitRepository(repoConfig)
@@ -60,59 +75,41 @@ func Summarize() {
 		return
 	}
 
-	fmt.Printf("Repository: %s\n", repoInfo.Name)
-	fmt.Printf("Path: %s\n", repoInfo.Path)
-	fmt.Printf("Total Commits: %d\n", repoInfo.TotalCommits)
-
-	if !repoInfo.FirstCommit.IsZero() {
-		fmt.Printf("First Commit: %s\n", repoInfo.FirstCommit.Format("2006-01-02 15:04:05"))
-	}
-	if !repoInfo.LastCommit.IsZero() {
-		fmt.Printf("Last Commit: %s\n", repoInfo.LastCommit.Format("2006-01-02 15:04:05"))
-	}
-
-	fmt.Printf("Branches: %d\n\n", len(repoInfo.Branches))
-
 	// If repository is empty, stop here
 	if repoInfo.TotalCommits == 0 {
 		fmt.Println("Repository has no commits yet.")
 		return
 	}
 
-	// Get commits for analysis (last year by default)
+	// Determine time range
 	endDate := time.Now()
 	startDate := endDate.AddDate(-1, 0, 0)
 
-	commits, err := repo.GetCommits(startDate, endDate, "")
+	if config.Since != nil {
+		startDate = *config.Since
+	}
+	if config.Until != nil {
+		endDate = *config.Until
+	}
+
+	// Get commits
+	commits, err := repo.GetCommits(startDate, endDate, config.Author)
 	if err != nil {
 		fmt.Printf("Error getting commits: %v\n", err)
 		return
 	}
 
 	if len(commits) == 0 {
-		fmt.Println("No commits found in the last year.")
+		fmt.Println("No commits found in the specified time range.")
 		return
 	}
 
 	// Convert git.Commit to models.Commit
 	modelCommits := convertGitCommitsToModelCommits(commits)
 
-	// Create analysis configuration
-	config := models.AnalysisConfig{
-		TimeRange: models.TimeRange{
-			Start: startDate,
-			End:   endDate,
-		},
-		IncludeMerges: true,
-		Limit:         0, // No limit
-	}
-
-	// Analyze statistics
-	statsAnalyzer := analyzers.NewStatisticsAnalyzer()
-	summary, err := statsAnalyzer.AnalyzeStatistics(modelCommits, config)
-	if err != nil {
-		fmt.Printf("Error analyzing statistics: %v\n", err)
-		return
+	// Apply limit if specified
+	if config.Limit > 0 && len(modelCommits) > config.Limit {
+		modelCommits = modelCommits[:config.Limit]
 	}
 
 	// Get contributors
@@ -121,52 +118,77 @@ func Summarize() {
 		fmt.Printf("Error getting contributors: %v\n", err)
 		return
 	}
-
-	// Convert git.Contributor to models.Contributor
 	modelContributors := convertGitContributorsToModelContributors(gitContributors)
 
-	// Create render configuration
-	renderConfig := models.RenderConfig{
-		Width:       80,
-		Height:      25,
-		ColorScheme: "default",
-		ShowLegend:  true,
-		Interactive: false,
+	// Create analysis configuration
+	analysisConfig := models.AnalysisConfig{
+		TimeRange: models.TimeRange{
+			Start: startDate,
+			End:   endDate,
+		},
+		AuthorFilter:  config.Author,
+		IncludeMerges: true,
+		Limit:         config.Limit,
 	}
 
-	// Create charts renderer and display summary
-	chartsRenderer := visualizers.NewChartsRenderer(renderConfig)
-
-	// Render summary statistics
-	summaryOutput, err := chartsRenderer.RenderSummaryStats(summary, renderConfig)
+	// Analyze statistics
+	statsAnalyzer := analyzers.NewStatisticsAnalyzer()
+	summary, err := statsAnalyzer.AnalyzeStatistics(modelCommits, analysisConfig)
 	if err != nil {
-		fmt.Printf("Error rendering summary: %v\n", err)
+		fmt.Printf("Error analyzing statistics: %v\n", err)
 		return
 	}
 
-	fmt.Print(summaryOutput)
-
-	// Render contributor statistics if we have contributors
-	if len(modelContributors) > 0 {
-		fmt.Println("\n")
-		contributorOutput, err := chartsRenderer.RenderContributorStats(modelContributors, renderConfig)
-		if err != nil {
-			fmt.Printf("Error rendering contributors: %v\n", err)
-			return
-		}
-
-		fmt.Print(contributorOutput)
-	}
-
-	// Render time-based analysis
-	fmt.Println("\n")
-	timeAnalysisOutput, err := chartsRenderer.RenderTimeBasedAnalysis(summary, renderConfig)
+	// Analyze contributions for additional context
+	contribAnalyzer := analyzers.NewContributionAnalyzer()
+	contribGraph, err := contribAnalyzer.AnalyzeContributions(modelCommits, analysisConfig)
 	if err != nil {
-		fmt.Printf("Error rendering time analysis: %v\n", err)
+		fmt.Printf("Error analyzing contributions: %v\n", err)
 		return
 	}
 
-	fmt.Print(timeAnalysisOutput)
+	// Analyze health metrics
+	healthAnalyzer := analyzers.NewHealthAnalyzer()
+	healthMetrics, err := healthAnalyzer.AnalyzeHealth(modelCommits, modelContributors, analysisConfig)
+	if err != nil {
+		fmt.Printf("Error analyzing health: %v\n", err)
+		return
+	}
+
+	// Create analysis result
+	analysisResult := &models.AnalysisResult{
+		Repository: &models.RepositoryInfo{
+			Path:         repoInfo.Path,
+			Name:         repoInfo.Name,
+			TotalCommits: repoInfo.TotalCommits,
+			FirstCommit:  repoInfo.FirstCommit,
+			LastCommit:   repoInfo.LastCommit,
+			Branches:     repoInfo.Branches,
+		},
+		Summary:       summary,
+		Contributors:  modelContributors,
+		ContribGraph:  contribGraph,
+		HealthMetrics: healthMetrics,
+		TimeRange: models.TimeRange{
+			Start: startDate,
+			End:   endDate,
+		},
+	}
+
+	// Handle different output formats
+	switch config.Format {
+	case "json":
+		err = outputJSON(analysisResult, config)
+	case "csv":
+		err = outputCSV(analysisResult, config)
+	default:
+		err = outputTerminal(analysisResult, config, "summary")
+	}
+
+	if err != nil {
+		fmt.Printf("Error generating output: %v\n", err)
+		return
+	}
 }
 
 
