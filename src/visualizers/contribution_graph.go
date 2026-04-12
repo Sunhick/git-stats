@@ -67,13 +67,15 @@ func (cgr *ContributionGraphRenderer) RenderContributionGraph(graph *models.Cont
 	dayLines := strings.Split(dayLabels, "\n")
 	cellLines := strings.Split(contributionCells, "\n")
 
-	for i := 0; i < len(dayLines) && i < len(cellLines); i++ {
-		if strings.TrimSpace(dayLines[i]) != "" {
+	for i := 0; i < len(cellLines); i++ {
+		if i < len(dayLines) {
 			result.WriteString(dayLines[i])
+		} else {
 			result.WriteString(" ")
-			result.WriteString(cellLines[i])
-			result.WriteString("\n")
 		}
+		result.WriteString(" ")
+		result.WriteString(cellLines[i])
+		result.WriteString("\n")
 	}
 
 	// Add legend if enabled
@@ -89,8 +91,8 @@ func (cgr *ContributionGraphRenderer) RenderContributionGraph(graph *models.Cont
 func (cgr *ContributionGraphRenderer) RenderMonthLabels(startDate, endDate time.Time) string {
 	var result strings.Builder
 
-	// Add spacing for day-of-week labels
-	result.WriteString("    ")
+	// Add spacing for day-of-week labels (2 chars: label + space)
+	result.WriteString("  ")
 
 	// Adjust start date to Sunday for proper week alignment
 	current := startDate
@@ -98,23 +100,52 @@ func (cgr *ContributionGraphRenderer) RenderMonthLabels(startDate, endDate time.
 		current = current.AddDate(0, 0, -1)
 	}
 
+	// Build a slice of month labels positioned at the correct week offsets
+	// Each week = 1 character cell width
+	type monthMark struct {
+		week int
+		name string
+	}
+	var marks []monthMark
+
 	weekCount := 0
 	lastMonth := -1
 
 	for weekCount < 53 && current.Before(endDate.AddDate(0, 0, 7)) {
 		currentMonth := int(current.Month())
 
-		// Add month label at the beginning of each month
 		if currentMonth != lastMonth && (current.Day() <= 7 || weekCount == 0) {
-			monthName := current.Format("Jan")
-			result.WriteString(fmt.Sprintf("%-4s", monthName))
+			marks = append(marks, monthMark{week: weekCount, name: current.Format("Jan")})
 			lastMonth = currentMonth
-		} else {
-			result.WriteString("    ") // Add spacing
 		}
 
-		current = current.AddDate(0, 0, 7) // Move to next week
+		current = current.AddDate(0, 0, 7)
 		weekCount++
+	}
+
+	// Render labels, placing them at their week positions
+	// Only show a label if there's enough room before the next one
+	pos := 0
+	for i, m := range marks {
+		// Pad to reach this mark's position
+		for pos < m.week {
+			result.WriteString(" ")
+			pos++
+		}
+		// Check space available before next label
+		nextPos := weekCount
+		if i+1 < len(marks) {
+			nextPos = marks[i+1].week
+		}
+		space := nextPos - m.week
+		if space >= 3 {
+			result.WriteString(m.name)
+			pos += len(m.name)
+		} else {
+			// Not enough room, just skip
+			result.WriteString(" ")
+			pos++
+		}
 	}
 
 	return result.String()
